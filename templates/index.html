@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-4 mb-4">
+        <div class="card text-white bg-primary stat-card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 class="card-title">{{ total_clientes }}</h4>
+                        <p class="card-text">Clientes Registrados</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-users fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-4">
+        <div class="card text-white bg-success stat-card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 class="card-title">{{ total_movimientos }}</h4>
+                        <p class="card-text">Movimientos Realizados</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-exchange-alt fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-4">
+        <div class="card text-white bg-info stat-card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 class="card-title">RD$ {{ "%.2f"|format(total_ingresos) }}</h4>
+                        <p class="card-text">Total Ingresos</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-dollar-sign fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Acciones Rápidas</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <a href="{{ url_for('movimientos') }}" class="btn btn-primary w-100">
+                            <i class="fas fa-plus-circle me-2"></i>Nuevo Movimiento
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <a href="{{ url_for('consulta') }}" class="btn btn-success w-100">
+                            <i class="fas fa-search me-2"></i>Consultar Movimientos
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <a href="{{ url_for('reporte') }}" class="btn btn-info w-100">
+                            <i class="fas fa-chart-bar me-2"></i>Ver Reportes
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <a href="{{ url_for('clientes') }}" class="btn btn-warning w-100">
+                            <i class="fas fa-user-plus me-2"></i>Agregar Cliente
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Módulos del Sistema</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body text-center">
+                                <i class="fas fa-file-invoice fa-3x text-primary mb-3"></i>
+                                <h5>Tipos de Documentos</h5>
+                                <p class="text-muted">Gestión de recibos, notas de crédito, débito, etc.</p>
+                                <a href="{{ url_for('tipos_documentos') }}" class="btn btn-outline-primary">Gestionar</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body text-center">
+                                <i class="fas fa-concierge-bell fa-3x text-success mb-3"></i>
+                                <h5>Servicios</h5>
+                                <p class="text-muted">Gestión de colegiaturas, reingresos, inglés, etc.</p>
+                                <a href="{{ url_for('servicios') }}" class="btn btn-outline-success">Gestionar</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body text-center">
+                                <i class="fas fa-credit-card fa-3x text-info mb-3"></i>
+                                <h5>Formas de Pago</h5>
+                                <p class="text-muted">Gestión de contado, crédito, T-Pago, página, etc.</p>
+                                <a href="{{ url_for('formas_pago') }}" class="btn btn-outline-info">Gestionar</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

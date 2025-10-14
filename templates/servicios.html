@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+
+{% block page_title %}Gestión de Servicios Facturables{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-plus-circle me-2"></i>Agregar Nuevo Servicio
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('agregar_servicio') }}">
+                    <div class="row">
+                        <div class="col-md-8 mb-3">
+                            <label class="form-label">Descripción</label>
+                            <select class="form-select" name="descripcion" required>
+                                <option value="">Seleccionar servicio...</option>
+                                <option value="Colegiatura">Colegiatura</option>
+                                <option value="Matrícula">Matrícula</option>
+                                <option value="Reingreso">Reingreso</option>
+                                <option value="Inglés">Inglés</option>
+                                <option value="Derecho de Grado">Derecho de Grado</option>
+                                <option value="Pruebas de Admisión">Pruebas de Admisión</option>
+                                <option value="Constancias">Constancias</option>
+                                <option value="Traslados">Traslados</option>
+                                <option value="Equivalencias">Equivalencias</option>
+                                <option value="Certificaciones">Certificaciones</option>
+                                <option value="Cursos de Verano">Cursos de Verano</option>
+                                <option value="Seminarios">Seminarios</option>
+                                <option value="Talleres">Talleres</option>
+                                <option value="Diplomados">Diplomados</option>
+                                <option value="Maestrías">Maestrías</option>
+                                <option value="Doctorados">Doctorados</option>
+                                <option value="Libros">Libros</option>
+                                <option value="Material Didáctico">Material Didáctico</option>
+                                <option value="Laboratorios">Laboratorios</option>
+                                <option value="Actividades Extracurriculares">Actividades Extracurriculares</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <label class="form-label">Estado</label>
+                            <select class="form-select" name="estado" required>
+                                <option value="Activo">Activo</option>
+                                <option value="Inactivo">Inactivo</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <label class="form-label">&nbsp;</label>
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="fas fa-save me-2"></i>Guardar
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-list me-2"></i>Lista de Servicios
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Descripción</th>
+                                <th>Estado</th>
+                                <th class="table-actions">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for servicio in servicios %}
+                            <tr>
+                                <td>{{ servicio.id }}</td>
+                                <td>{{ servicio.descripcion }}</td>
+                                <td>
+                                    <span class="badge bg-{% if servicio.estado == 'Activo' %}success{% else %}danger{% endif %}">
+                                        {{ servicio.estado }}
+                                    </span>
+                                </td>
+                                <td class="table-actions">
+                                    <button type="button" class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editModal{{ servicio.id }}">
+                                        <i class="fas fa-edit me-1"></i>Editar
+                                    </button>
+                                    <a href="{{ url_for('eliminar_servicio', id=servicio.id) }}" class="btn btn-sm btn-danger" onclick="return confirmDelete()">
+                                        <i class="fas fa-trash me-1"></i>Eliminar
+                                    </a>
+                                </td>
+                            </tr>
+
+                            <!-- Modal de Edición -->
+                            <div class="modal fade" id="editModal{{ servicio.id }}" tabindex="-1">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title">Editar Servicio</h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <form method="POST" action="{{ url_for('editar_servicio', id=servicio.id) }}">
+                                            <div class="modal-body">
+                                                <div class="mb-3">
+                                                    <label class="form-label">Descripción</label>
+                                                    <select class="form-select" name="descripcion" required>
+                                                        <option value="Colegiatura" {% if servicio.descripcion == 'Colegiatura' %}selected{% endif %}>Colegiatura</option>
+                                                        <option value="Matrícula" {% if servicio.descripcion == 'Matrícula' %}selected{% endif %}>Matrícula</option>
+                                                        <option value="Reingreso" {% if servicio.descripcion == 'Reingreso' %}selected{% endif %}>Reingreso</option>
+                                                        <option value="Inglés" {% if servicio.descripcion == 'Inglés' %}selected{% endif %}>Inglés</option>
+                                                        <option value="Derecho de Grado" {% if servicio.descripcion == 'Derecho de Grado' %}selected{% endif %}>Derecho de Grado</option>
+                                                        <option value="Pruebas de Admisión" {% if servicio.descripcion == 'Pruebas de Admisión' %}selected{% endif %}>Pruebas de Admisión</option>
+                                                        <option value="Constancias" {% if servicio.descripcion == 'Constancias' %}selected{% endif %}>Constancias</option>
+                                                        <option value="Traslados" {% if servicio.descripcion == 'Traslados' %}selected{% endif %}>Traslados</option>
+                                                        <option value="Equivalencias" {% if servicio.descripcion == 'Equivalencias' %}selected{% endif %}>Equivalencias</option>
+                                                        <option value="Certificaciones" {% if servicio.descripcion == 'Certificaciones' %}selected{% endif %}>Certificaciones</option>
+                                                        <option value="Cursos de Verano" {% if servicio.descripcion == 'Cursos de Verano' %}selected{% endif %}>Cursos de Verano</option>
+                                                        <option value="Seminarios" {% if servicio.descripcion == 'Seminarios' %}selected{% endif %}>Seminarios</option>
+                                                        <option value="Talleres" {% if servicio.descripcion == 'Talleres' %}selected{% endif %}>Talleres</option>
+                                                        <option value="Diplomados" {% if servicio.descripcion == 'Diplomados' %}selected{% endif %}>Diplomados</option>
+                                                        <option value="Maestrías" {% if servicio.descripcion == 'Maestrías' %}selected{% endif %}>Maestrías</option>
+                                                        <option value="Doctorados" {% if servicio.descripcion == 'Doctorados' %}selected{% endif %}>Doctorados</option>
+                                                        <option value="Libros" {% if servicio.descripcion == 'Libros' %}selected{% endif %}>Libros</option>
+                                                        <option value="Material Didáctico" {% if servicio.descripcion == 'Material Didáctico' %}selected{% endif %}>Material Didáctico</option>
+                                                        <option value="Laboratorios" {% if servicio.descripcion == 'Laboratorios' %}selected{% endif %}>Laboratorios</option>
+                                                        <option value="Actividades Extracurriculares" {% if servicio.descripcion == 'Actividades Extracurriculares' %}selected{% endif %}>Actividades Extracurriculares</option>
+                                                    </select>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="form-label">Estado</label>
+                                                    <select class="form-select" name="estado" required>
+                                                        <option value="Activo" {% if servicio.estado == 'Activo' %}selected{% endif %}>Activo</option>
+                                                        <option value="Inactivo" {% if servicio.estado == 'Inactivo' %}selected{% endif %}>Inactivo</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                                <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                            {% else %}
+                            <tr>
+                                <td colspan="4" class="text-center text-muted">No hay servicios registrados</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

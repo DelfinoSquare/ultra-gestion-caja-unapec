@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+
+{% block page_title %}Gestión de Empleados{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-plus-circle me-2"></i>Agregar Nuevo Empleado
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('agregar_empleado') }}">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Nombre Completo</label>
+                            <input type="text" class="form-control" name="nombre" placeholder="Nombre y Apellido" required>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Cédula</label>
+                            <input type="text" class="form-control" name="cedula" placeholder="Cédula" required>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Tanda Labor</label>
+                            <select class="form-select" name="tanda_labor" required>
+                                <option value="Matutina">Matutina</option>
+                                <option value="Vespertina">Vespertina</option>
+                                <option value="Nocturna">Nocturna</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <label class="form-label">Estado</label>
+                            <select class="form-select" name="estado" required>
+                                <option value="Activo">Activo</option>
+                                <option value="Inactivo">Inactivo</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Fecha de Ingreso</label>
+                            <input type="date" class="form-control" name="fecha_ingreso" required>
+                        </div>
+                        <div class="col-md-8 mb-3 d-flex align-items-end">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-2"></i>Guardar Empleado
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-list me-2"></i>Lista de Empleados
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Nombre</th>
+                                <th>Cédula</th>
+                                <th>Tanda Labor</th>
+                                <th>Fecha Ingreso</th>
+                                <th>Estado</th>
+                                <th class="table-actions">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for empleado in empleados %}
+                            <tr>
+                                <td>{{ empleado.id }}</td>
+                                <td>{{ empleado.nombre }}</td>
+                                <td>{{ empleado.cedula }}</td>
+                                <td>
+                                    <span class="badge bg-secondary">{{ empleado.tanda_labor }}</span>
+                                </td>
+                                <td>{{ empleado.fecha_ingreso.strftime('%d/%m/%Y') }}</td>
+                                <td>
+                                    <span class="badge bg-{% if empleado.estado == 'Activo' %}success{% else %}danger{% endif %}">
+                                        {{ empleado.estado }}
+                                    </span>
+                                </td>
+                                <td class="table-actions">
+                                    <button type="button" class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editModal{{ empleado.id }}">
+                                        <i class="fas fa-edit me-1"></i>Editar
+                                    </button>
+                                    <a href="{{ url_for('eliminar_empleado', id=empleado.id) }}" class="btn btn-sm btn-danger" onclick="return confirmDelete()">
+                                        <i class="fas fa-trash me-1"></i>Eliminar
+                                    </a>
+                                </td>
+                            </tr>
+
+                            <!-- Modal de Edición -->
+                            <div class="modal fade" id="editModal{{ empleado.id }}" tabindex="-1">
+                                <div class="modal-dialog modal-lg">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title">Editar Empleado</h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <form method="POST" action="{{ url_for('editar_empleado', id=empleado.id) }}">
+                                            <div class="modal-body">
+                                                <div class="row">
+                                                    <div class="col-md-6 mb-3">
+                                                        <label class="form-label">Nombre Completo</label>
+                                                        <input type="text" class="form-control" name="nombre" value="{{ empleado.nombre }}" required>
+                                                    </div>
+                                                    <div class="col-md-6 mb-3">
+                                                        <label class="form-label">Cédula</label>
+                                                        <input type="text" class="form-control" name="cedula" value="{{ empleado.cedula }}" required>
+                                                    </div>
+                                                </div>
+                                                <div class="row">
+                                                    <div class="col-md-4 mb-3">
+                                                        <label class="form-label">Tanda Labor</label>
+                                                        <select class="form-select" name="tanda_labor" required>
+                                                            <option value="Matutina" {% if empleado.tanda_labor == 'Matutina' %}selected{% endif %}>Matutina</option>
+                                                            <option value="Vespertina" {% if empleado.tanda_labor == 'Vespertina' %}selected{% endif %}>Vespertina</option>
+                                                            <option value="Nocturna" {% if empleado.tanda_labor == 'Nocturna' %}selected{% endif %}>Nocturna</option>
+                                                        </select>
+                                                    </div>
+                                                    <div class="col-md-4 mb-3">
+                                                        <label class="form-label">Fecha de Ingreso</label>
+                                                        <input type="date" class="form-control" name="fecha_ingreso" value="{{ empleado.fecha_ingreso.strftime('%Y-%m-%d') }}" required>
+                                                    </div>
+                                                    <div class="col-md-4 mb-3">
+                                                        <label class="form-label">Estado</label>
+                                                        <select class="form-select" name="estado" required>
+                                                            <option value="Activo" {% if empleado.estado == 'Activo' %}selected{% endif %}>Activo</option>
+                                                            <option value="Inactivo" {% if empleado.estado == 'Inactivo' %}selected{% endif %}>Inactivo</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                                <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                            {% else %}
+                            <tr>
+                                <td colspan="7" class="text-center text-muted">No hay empleados registrados</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

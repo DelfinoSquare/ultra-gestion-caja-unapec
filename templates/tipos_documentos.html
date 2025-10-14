@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+
+{% block page_title %}Gestión de Tipos de Documentos{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-plus-circle me-2"></i>Agregar Nuevo Tipo de Documento
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('agregar_tipo_documento') }}">
+                    <div class="row">
+                        <div class="col-md-8 mb-3">
+                            <label class="form-label">Descripción</label>
+                            <select class="form-select" name="descripcion" required>
+                                <option value="">Seleccionar tipo de documento...</option>
+                                <option value="Recibo de Ingreso">Recibo de Ingreso</option>
+                                <option value="Nota de Crédito">Nota de Crédito</option>
+                                <option value="Nota de Débito">Nota de Débito</option>
+                                <option value="Factura">Factura</option>
+                                <option value="Comprobante de Pago">Comprobante de Pago</option>
+                                <option value="Vale de Caja">Vale de Caja</option>
+                                <option value="Cheque">Cheque</option>
+                                <option value="Transferencia">Transferencia</option>
+                                <option value="Depósito Bancario">Depósito Bancario</option>
+                                <option value="Pago en Línea">Pago en Línea</option>
+                                <option value="Recibo de Matrícula">Recibo de Matrícula</option>
+                                <option value="Recibo de Colegiatura">Recibo de Colegiatura</option>
+                                <option value="Recibo de Derecho de Grado">Recibo de Derecho de Grado</option>
+                                <option value="Recibo de Reingreso">Recibo de Reingreso</option>
+                                <option value="Recibo de Pruebas de Admisión">Recibo de Pruebas de Admisión</option>
+                                <option value="Recibo de Constancias">Recibo de Constancias</option>
+                                <option value="Recibo de Traslados">Recibo de Traslados</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <label class="form-label">Estado</label>
+                            <select class="form-select" name="estado" required>
+                                <option value="Activo">Activo</option>
+                                <option value="Inactivo">Inactivo</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <label class="form-label">&nbsp;</label>
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="fas fa-save me-2"></i>Guardar
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-list me-2"></i>Lista de Tipos de Documentos
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Descripción</th>
+                                <th>Estado</th>
+                                <th class="table-actions">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for tipo in tipos %}
+                            <tr>
+                                <td>{{ tipo.id }}</td>
+                                <td>{{ tipo.descripcion }}</td>
+                                <td>
+                                    <span class="badge bg-{% if tipo.estado == 'Activo' %}success{% else %}danger{% endif %}">
+                                        {{ tipo.estado }}
+                                    </span>
+                                </td>
+                                <td class="table-actions">
+                                    <button type="button" class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editModal{{ tipo.id }}">
+                                        <i class="fas fa-edit me-1"></i>Editar
+                                    </button>
+                                    <a href="{{ url_for('eliminar_tipo_documento', id=tipo.id) }}" class="btn btn-sm btn-danger" onclick="return confirmDelete()">
+                                        <i class="fas fa-trash me-1"></i>Eliminar
+                                    </a>
+                                </td>
+                            </tr>
+
+                            <!-- Modal de Edición -->
+                            <div class="modal fade" id="editModal{{ tipo.id }}" tabindex="-1">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title">Editar Tipo de Documento</h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <form method="POST" action="{{ url_for('editar_tipo_documento', id=tipo.id) }}">
+                                            <div class="modal-body">
+                                                <div class="mb-3">
+                                                    <label class="form-label">Descripción</label>
+                                                    <select class="form-select" name="descripcion" required>
+                                                        <option value="Recibo de Ingreso" {% if tipo.descripcion == 'Recibo de Ingreso' %}selected{% endif %}>Recibo de Ingreso</option>
+                                                        <option value="Nota de Crédito" {% if tipo.descripcion == 'Nota de Crédito' %}selected{% endif %}>Nota de Crédito</option>
+                                                        <option value="Nota de Débito" {% if tipo.descripcion == 'Nota de Débito' %}selected{% endif %}>Nota de Débito</option>
+                                                        <option value="Factura" {% if tipo.descripcion == 'Factura' %}selected{% endif %}>Factura</option>
+                                                        <option value="Comprobante de Pago" {% if tipo.descripcion == 'Comprobante de Pago' %}selected{% endif %}>Comprobante de Pago</option>
+                                                        <option value="Vale de Caja" {% if tipo.descripcion == 'Vale de Caja' %}selected{% endif %}>Vale de Caja</option>
+                                                        <option value="Cheque" {% if tipo.descripcion == 'Cheque' %}selected{% endif %}>Cheque</option>
+                                                        <option value="Transferencia" {% if tipo.descripcion == 'Transferencia' %}selected{% endif %}>Transferencia</option>
+                                                        <option value="Depósito Bancario" {% if tipo.descripcion == 'Depósito Bancario' %}selected{% endif %}>Depósito Bancario</option>
+                                                        <option value="Pago en Línea" {% if tipo.descripcion == 'Pago en Línea' %}selected{% endif %}>Pago en Línea</option>
+                                                        <option value="Recibo de Matrícula" {% if tipo.descripcion == 'Recibo de Matrícula' %}selected{% endif %}>Recibo de Matrícula</option>
+                                                        <option value="Recibo de Colegiatura" {% if tipo.descripcion == 'Recibo de Colegiatura' %}selected{% endif %}>Recibo de Colegiatura</option>
+                                                        <option value="Recibo de Derecho de Grado" {% if tipo.descripcion == 'Recibo de Derecho de Grado' %}selected{% endif %}>Recibo de Derecho de Grado</option>
+                                                        <option value="Recibo de Reingreso" {% if tipo.descripcion == 'Recibo de Reingreso' %}selected{% endif %}>Recibo de Reingreso</option>
+                                                        <option value="Recibo de Pruebas de Admisión" {% if tipo.descripcion == 'Recibo de Pruebas de Admisión' %}selected{% endif %}>Recibo de Pruebas de Admisión</option>
+                                                        <option value="Recibo de Constancias" {% if tipo.descripcion == 'Recibo de Constancias' %}selected{% endif %}>Recibo de Constancias</option>
+                                                        <option value="Recibo de Traslados" {% if tipo.descripcion == 'Recibo de Traslados' %}selected{% endif %}>Recibo de Traslados</option>
+                                                    </select>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="form-label">Estado</label>
+                                                    <select class="form-select" name="estado" required>
+                                                        <option value="Activo" {% if tipo.estado == 'Activo' %}selected{% endif %}>Activo</option>
+                                                        <option value="Inactivo" {% if tipo.estado == 'Inactivo' %}selected{% endif %}>Inactivo</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                                <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                            {% else %}
+                            <tr>
+                                <td colspan="4" class="text-center text-muted">No hay tipos de documentos registrados</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

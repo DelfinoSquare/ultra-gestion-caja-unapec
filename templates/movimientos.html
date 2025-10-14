@@ -1,0 +1,47 @@
+# Movimientos de Caja - Ahora con filtros
+@app.route('/movimientos')
+def movimientos():
+    # Obtener parámetros de filtro
+    empleado_id = request.args.get('empleado_id', type=int)
+    cliente_id = request.args.get('cliente_id', type=int)
+    servicio_id = request.args.get('servicio_id', type=int)
+    tipo_documento_id = request.args.get('tipo_documento_id', type=int)
+    fecha_desde = request.args.get('fecha_desde')
+    fecha_hasta = request.args.get('fecha_hasta')
+    
+    # Construir query base
+    query = MovimientoCaja.query
+    
+    # Aplicar filtros
+    if empleado_id:
+        query = query.filter_by(empleado_id=empleado_id)
+    if cliente_id:
+        query = query.filter_by(cliente_id=cliente_id)
+    if servicio_id:
+        query = query.filter_by(servicio_id=servicio_id)
+    if tipo_documento_id:
+        query = query.filter_by(tipo_documento_id=tipo_documento_id)
+    if fecha_desde:
+        query = query.filter(MovimientoCaja.fecha_movimiento >= fecha_desde)
+    if fecha_hasta:
+        query = query.filter(MovimientoCaja.fecha_movimiento <= fecha_hasta)
+    
+    # Obtener movimientos filtrados
+    movimientos_list = query.order_by(MovimientoCaja.fecha_movimiento.desc()).all()
+    
+    # Obtener datos para los filtros
+    tipos_documentos = TipoDocumento.query.filter_by(estado='Activo').all()
+    servicios = Servicio.query.filter_by(estado='Activo').all()
+    formas_pago = FormaPago.query.filter_by(estado='Activo').all()
+    modalidades_pago = ModalidadPago.query.filter_by(estado='Activo').all()
+    clientes = Cliente.query.filter_by(estado='Activo').all()
+    empleados = Empleado.query.filter_by(estado='Activo').all()
+    
+    return render_template('movimientos.html', 
+                         movimientos=movimientos_list,
+                         tipos_documentos=tipos_documentos,
+                         servicios=servicios,
+                         formas_pago=formas_pago,
+                         modalidades_pago=modalidades_pago,
+                         clientes=clientes,
+                         empleados=empleados)
