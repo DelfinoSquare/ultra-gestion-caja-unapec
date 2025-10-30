@@ -12,9 +12,29 @@
         .stat-card { transition: transform 0.2s; }
         .stat-card:hover { transform: translateY(-5px); }
         .table-actions { white-space: nowrap; }
+        .user-menu { cursor: pointer; }
+        .sidebar .nav-link { 
+            color: #495057; 
+            padding: 0.75rem 1rem;
+            border-radius: 0.25rem;
+            margin-bottom: 0.25rem;
+        }
+        .sidebar .nav-link:hover { 
+            background-color: #e9ecef; 
+            color: #007bff;
+        }
+        .sidebar .nav-link.active { 
+            background-color: #007bff; 
+            color: white;
+        }
+        .sidebar-heading {
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
     </style>
 </head>
 <body>
+    {% if current_user.is_authenticated %}
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
         <div class="container">
             <a class="navbar-brand" href="{{ url_for('index') }}">
@@ -25,20 +45,20 @@
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('movimientos') }}">
-                            <i class="fas fa-exchange-alt me-1"></i>Movimientos
+                    <li class="nav-item dropdown user-menu">
+                        <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-user me-1"></i>{{ current_user.username }}
+                            <span class="badge bg-light text-dark ms-1">{{ current_user.rol.nombre }}</span>
                         </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('consulta') }}">
-                            <i class="fas fa-search me-1"></i>Consulta
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('reporte') }}">
-                            <i class="fas fa-chart-bar me-1"></i>Reportes
-                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="{{ url_for('perfil') }}">
+                                <i class="fas fa-user-circle me-2"></i>Mi Perfil
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('logout') }}">
+                                <i class="fas fa-sign-out-alt me-2"></i>Cerrar Sesión
+                            </a></li>
+                        </ul>
                     </li>
                 </ul>
             </div>
@@ -51,40 +71,104 @@
             <div class="col-md-3 col-lg-2 bg-light sidebar">
                 <div class="position-sticky pt-3">
                     <h6 class="sidebar-heading d-flex justify-content-between align-items-center px-3 mt-4 mb-1 text-muted text-uppercase">
-                        <span>Configuración</span>
+                        <span>Navegación</span>
                     </h6>
                     <ul class="nav flex-column">
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('tipos_documentos') }}">
-                                <i class="fas fa-file-invoice me-2"></i>Tipos de Documentos
+                            <a class="nav-link" href="{{ url_for('index') }}">
+                                <i class="fas fa-home me-2"></i>Dashboard
+                            </a>
+                        </li>
+                        
+                        {% if current_user.rol.nombre in ['ADMIN', 'GERENTE', 'CAJERO'] %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('movimientos') }}">
+                                <i class="fas fa-exchange-alt me-2"></i>Movimientos
+                            </a>
+                        </li>
+                        {% endif %}
+                        
+                        {% if current_user.rol.nombre in ['ADMIN', 'GERENTE', 'CONSULTA'] %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('consulta') }}">
+                                <i class="fas fa-search me-2"></i>Consulta
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('servicios') }}">
-                                <i class="fas fa-concierge-bell me-2"></i>Servicios
+                            <a class="nav-link" href="{{ url_for('reporte') }}">
+                                <i class="fas fa-chart-bar me-2"></i>Reportes
                             </a>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('formas_pago') }}">
-                                <i class="fas fa-credit-card me-2"></i>Formas de Pago
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('modalidades_pago') }}">
-                                <i class="fas fa-calendar-alt me-2"></i>Modalidades de Pago
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('clientes') }}">
-                                <i class="fas fa-users me-2"></i>Clientes
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('empleados') }}">
-                                <i class="fas fa-user-tie me-2"></i>Empleados
-                            </a>
-                        </li>
+                        {% endif %}
+
+                        {% if current_user.rol.nombre in ['ADMIN', 'GERENTE'] %}
+                        <h6 class="sidebar-heading d-flex justify-content-between align-items-center px-3 mt-4 mb-1 text-muted text-uppercase">
+                            <span>Administración</span>
+                        </h6>
+                        <ul class="nav flex-column">
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ url_for('tipos_documentos') }}">
+                                    <i class="fas fa-file-invoice me-2"></i>Tipos de Documentos
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ url_for('servicios') }}">
+                                    <i class="fas fa-concierge-bell me-2"></i>Servicios
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ url_for('formas_pago') }}">
+                                    <i class="fas fa-credit-card me-2"></i>Formas de Pago
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ url_for('modalidades_pago') }}">
+                                    <i class="fas fa-calendar-alt me-2"></i>Modalidades de Pago
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ url_for('clientes') }}">
+                                    <i class="fas fa-users me-2"></i>Clientes
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ url_for('empleados') }}">
+                                    <i class="fas fa-user-tie me-2"></i>Empleados
+                                </a>
+                            </li>
+                        </ul>
+                        {% endif %}
+
+                        {% if current_user.rol.nombre == 'ADMIN' %}
+                        <h6 class="sidebar-heading d-flex justify-content-between align-items-center px-3 mt-4 mb-1 text-muted text-uppercase">
+                            <span>Seguridad</span>
+                        </h6>
+                        <ul class="nav flex-column">
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ url_for('admin_usuarios') }}">
+                                    <i class="fas fa-users-cog me-2"></i>Usuarios
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ url_for('admin_roles') }}">
+                                    <i class="fas fa-shield-alt me-2"></i>Roles
+                                </a>
+                            </li>
+                        </ul>
+                        {% endif %}
                     </ul>
+
+                    <!-- Información del sistema -->
+                    <div class="mt-5 px-3">
+                        <small class="text-muted">
+                            <i class="fas fa-info-circle me-1"></i>
+                            <strong>Sistema:</strong> Caja UNAPEC<br>
+                            <i class="fas fa-user me-1"></i>
+                            <strong>Rol:</strong> {{ current_user.rol.nombre }}<br>
+                            <i class="fas fa-clock me-1"></i>
+                            <strong>Hora:</strong> <span id="current-time"></span>
+                        </small>
+                    </div>
                 </div>
             </div>
 
@@ -92,6 +176,14 @@
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <h1 class="h2">{% block page_title %}{% endblock %}</h1>
+                    <div class="btn-toolbar mb-2 mb-md-0">
+                        <div class="btn-group me-2">
+                            <span class="btn btn-sm btn-outline-secondary">
+                                <i class="fas fa-calendar me-1"></i>
+                                {{ datetime.now().strftime('%d/%m/%Y') }}
+                            </span>
+                        </div>
+                    </div>
                 </div>
 
                 {% with messages = get_flashed_messages(with_categories=true) %}
@@ -109,6 +201,9 @@
             </main>
         </div>
     </div>
+    {% else %}
+        {% block login_content %}{% endblock %}
+    {% endif %}
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
@@ -116,6 +211,31 @@
         function confirmDelete(message = '¿Está seguro que desea eliminar este registro?') {
             return confirm(message);
         }
+
+        // Hora actual en tiempo real
+        function updateTime() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('es-DO', { 
+                hour: '2-digit', 
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            document.getElementById('current-time').textContent = timeString;
+        }
+
+        // Actualizar hora cada segundo
+        if (document.getElementById('current-time')) {
+            updateTime();
+            setInterval(updateTime, 1000);
+        }
+
+        // Activar tooltips
+        document.addEventListener('DOMContentLoaded', function() {
+            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl);
+            });
+        });
     </script>
 </body>
 </html>
