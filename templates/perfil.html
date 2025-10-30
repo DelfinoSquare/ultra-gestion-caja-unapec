@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+
+{% block page_title %}Mi Perfil{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-user-circle me-2"></i>Información del Perfil
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4 text-center mb-4">
+                        <div class="bg-primary text-white rounded-circle d-inline-flex align-items-center justify-content-center" style="width: 100px; height: 100px;">
+                            <i class="fas fa-user fa-3x"></i>
+                        </div>
+                        <h4 class="mt-3">{{ current_user.username }}</h4>
+                        <span class="badge bg-{% if current_user.estado == 'Activo' %}success{% else %}danger{% endif %}">
+                            {{ current_user.estado }}
+                        </span>
+                    </div>
+                    <div class="col-md-8">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <strong><i class="fas fa-id-card me-2"></i>Usuario:</strong>
+                                <p class="mt-1">{{ current_user.username }}</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <strong><i class="fas fa-envelope me-2"></i>Email:</strong>
+                                <p class="mt-1">{{ current_user.email }}</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <strong><i class="fas fa-user-tag me-2"></i>Rol:</strong>
+                                <p class="mt-1">
+                                    <span class="badge bg-info">{{ current_user.rol.nombre }}</span>
+                                </p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <strong><i class="fas fa-calendar me-2"></i>Último acceso:</strong>
+                                <p class="mt-1">
+                                    {% if current_user.ultimo_acceso %}
+                                        {{ current_user.ultimo_acceso.strftime('%d/%m/%Y %H:%M') }}
+                                    {% else %}
+                                        No registrado
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <strong><i class="fas fa-user-tie me-2"></i>Empleado asociado:</strong>
+                                <p class="mt-1">
+                                    {% if current_user.empleado %}
+                                        {{ current_user.empleado.nombre }}
+                                    {% else %}
+                                        No asociado
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <strong><i class="fas fa-clock me-2"></i>Miembro desde:</strong>
+                                <p class="mt-1">{{ current_user.fecha_creacion.strftime('%d/%m/%Y') }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="card-title mb-0">
+                                    <i class="fas fa-shield-alt me-2"></i>Permisos y Accesos
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <h6>Módulos Accesibles:</h6>
+                                        <ul class="list-group">
+                                            {% for modulo in obtener_modulos_permitidos(current_user.rol.nombre) %}
+                                            <li class="list-group-item">
+                                                <i class="fas fa-check text-success me-2"></i>{{ modulo }}
+                                            </li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <h6>Acciones Permitidas:</h6>
+                                        <ul class="list-group">
+                                            {% for accion in obtener_acciones_permitidas(current_user.rol.nombre) %}
+                                            <li class="list-group-item">
+                                                <i class="fas fa-play text-primary me-2"></i>{{ accion }}
+                                            </li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

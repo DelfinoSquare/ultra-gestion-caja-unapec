@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+
+{% block page_title %}Gestión de Usuarios{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <!-- Formulario para agregar usuario -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-user-plus me-2"></i>Agregar Nuevo Usuario
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('agregar_usuario') }}">
+                    <div class="row">
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Usuario *</label>
+                            <input type="text" class="form-control" name="username" required>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Contraseña *</label>
+                            <input type="password" class="form-control" name="password" required>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Email *</label>
+                            <input type="email" class="form-control" name="email" required>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Rol *</label>
+                            <select class="form-select" name="rol_id" required>
+                                {% for rol in roles %}
+                                <option value="{{ rol.id }}">{{ rol.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Empleado Asociado</label>
+                            <select class="form-select" name="empleado_id">
+                                <option value="">Sin empleado asociado</option>
+                                {% for empleado in empleados %}
+                                <option value="{{ empleado.id }}">{{ empleado.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Estado *</label>
+                            <select class="form-select" name="estado" required>
+                                <option value="Activo">Activo</option>
+                                <option value="Inactivo">Inactivo</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3 d-flex align-items-end">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="fas fa-save me-2"></i>Crear Usuario
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Lista de usuarios -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-users me-2"></i>Lista de Usuarios del Sistema
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Usuario</th>
+                                <th>Email</th>
+                                <th>Rol</th>
+                                <th>Empleado</th>
+                                <th>Estado</th>
+                                <th>Último Acceso</th>
+                                <th class="table-actions">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for usuario in usuarios %}
+                            <tr>
+                                <td>{{ usuario.id }}</td>
+                                <td>
+                                    <strong>{{ usuario.username }}</strong>
+                                    {% if usuario.id == current_user.id %}
+                                    <span class="badge bg-info ms-1">Tú</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ usuario.email }}</td>
+                                <td>
+                                    <span class="badge bg-secondary">{{ usuario.rol.nombre }}</span>
+                                </td>
+                                <td>
+                                    {% if usuario.empleado %}
+                                    {{ usuario.empleado.nombre }}
+                                    {% else %}
+                                    <span class="text-muted">No asociado</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge bg-{% if usuario.estado == 'Activo' %}success{% else %}danger{% endif %}">
+                                        {{ usuario.estado }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if usuario.ultimo_acceso %}
+                                    {{ usuario.ultimo_acceso.strftime('%d/%m/%Y %H:%M') }}
+                                    {% else %}
+                                    <span class="text-muted">Nunca</span>
+                                    {% endif %}
+                                </td>
+                                <td class="table-actions">
+                                    <button type="button" class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editUserModal{{ usuario.id }}">
+                                        <i class="fas fa-edit me-1"></i>Editar
+                                    </button>
+                                    {% if usuario.id != current_user.id %}
+                                    <a href="{{ url_for('eliminar_usuario', id=usuario.id) }}" 
+                                       class="btn btn-sm btn-danger" 
+                                       onclick="return confirm('¿Está seguro de eliminar este usuario?')">
+                                        <i class="fas fa-trash me-1"></i>Eliminar
+                                    </a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+
+                            <!-- Modal de Edición -->
+                            <div class="modal fade" id="editUserModal{{ usuario.id }}" tabindex="-1">
+                                <div class="modal-dialog modal-lg">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title">Editar Usuario: {{ usuario.username }}</h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <form method="POST" action="{{ url_for('editar_usuario', id=usuario.id) }}">
+                                            <div class="modal-body">
+                                                <div class="row">
+                                                    <div class="col-md-6 mb-3">
+                                                        <label class="form-label">Usuario</label>
+                                                        <input type="text" class="form-control" value="{{ usuario.username }}" readonly>
+                                                        <small class="form-text text-muted">El nombre de usuario no se puede cambiar</small>
+                                                    </div>
+                                                    <div class="col-md-6 mb-3">
+                                                        <label class="form-label">Email *</label>
+                                                        <input type="email" class="form-control" name="email" value="{{ usuario.email }}" required>
+                                                    </div>
+                                                </div>
+                                                <div class="row">
+                                                    <div class="col-md-6 mb-3">
+                                                        <label class="form-label">Nueva Contraseña</label>
+                                                        <input type="password" class="form-control" name="nueva_password" placeholder="Dejar vacío para mantener la actual">
+                                                    </div>
+                                                    <div class="col-md-6 mb-3">
+                                                        <label class="form-label">Rol *</label>
+                                                        <select class="form-select" name="rol_id" required>
+                                                            {% for rol in roles %}
+                                                            <option value="{{ rol.id }}" {% if usuario.rol_id == rol.id %}selected{% endif %}>
+                                                                {{ rol.nombre }}
+                                                            </option>
+                                                            {% endfor %}
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                                <div class="row">
+                                                    <div class="col-md-6 mb-3">
+                                                        <label class="form-label">Empleado Asociado</label>
+                                                        <select class="form-select" name="empleado_id">
+                                                            <option value="">Sin empleado asociado</option>
+                                                            {% for empleado in empleados %}
+                                                            <option value="{{ empleado.id }}" {% if usuario.empleado_id == empleado.id %}selected{% endif %}>
+                                                                {{ empleado.nombre }}
+                                                            </option>
+                                                            {% endfor %}
+                                                        </select>
+                                                    </div>
+                                                    <div class="col-md-6 mb-3">
+                                                        <label class="form-label">Estado *</label>
+                                                        <select class="form-select" name="estado" required>
+                                                            <option value="Activo" {% if usuario.estado == 'Activo' %}selected{% endif %}>Activo</option>
+                                                            <option value="Inactivo" {% if usuario.estado == 'Inactivo' %}selected{% endif %}>Inactivo</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                                <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

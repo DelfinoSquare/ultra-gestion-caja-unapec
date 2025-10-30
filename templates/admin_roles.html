@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+
+{% block page_title %}Gestión de Roles del Sistema{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-user-tag me-2"></i>Roles del Sistema
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Nombre del Rol</th>
+                                <th>Descripción</th>
+                                <th>Usuarios Asignados</th>
+                                <th class="table-actions">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for rol in roles %}
+                            <tr>
+                                <td>{{ rol.id }}</td>
+                                <td>
+                                    <span class="badge bg-primary">{{ rol.nombre }}</span>
+                                </td>
+                                <td>{{ rol.descripcion }}</td>
+                                <td>
+                                    <span class="badge bg-info">{{ rol.usuarios|length }} usuarios</span>
+                                </td>
+                                <td class="table-actions">
+                                    <button type="button" class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editRoleModal{{ rol.id }}">
+                                        <i class="fas fa-edit me-1"></i>Editar Descripción
+                                    </button>
+                                </td>
+                            </tr>
+
+                            <!-- Modal de Edición -->
+                            <div class="modal fade" id="editRoleModal{{ rol.id }}" tabindex="-1">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title">Editar Rol: {{ rol.nombre }}</h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <form method="POST" action="{{ url_for('editar_rol', id=rol.id) }}">
+                                            <div class="modal-body">
+                                                <div class="mb-3">
+                                                    <label class="form-label">Nombre del Rol</label>
+                                                    <input type="text" class="form-control" value="{{ rol.nombre }}" readonly>
+                                                    <small class="form-text text-muted">El nombre del rol no se puede cambiar</small>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="form-label">Descripción</label>
+                                                    <textarea class="form-control" name="descripcion" rows="3">{{ rol.descripcion }}</textarea>
+                                                </div>
+                                                <div class="alert alert-info">
+                                                    <small>
+                                                        <i class="fas fa-info-circle me-1"></i>
+                                                        <strong>Permisos del rol {{ rol.nombre }}:</strong><br>
+                                                        {% if rol.nombre == 'ADMIN' %}
+                                                        Acceso completo a todos los módulos y funciones del sistema.
+                                                        {% elif rol.nombre == 'GERENTE' %}
+                                                        Acceso a movimientos, consultas, reportes y administración (excepto seguridad).
+                                                        {% elif rol.nombre == 'CAJERO' %}
+                                                        Acceso solo a movimientos de caja.
+                                                        {% elif rol.nombre == 'CONSULTA' %}
+                                                        Acceso solo a consultas y reportes (solo lectura).
+                                                        {% endif %}
+                                                    </small>
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                                <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Información sobre permisos -->
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="card-title mb-0">
+                                    <i class="fas fa-info-circle me-2"></i>Información sobre Permisos
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <h6>Módulos por Rol:</h6>
+                                        <ul class="list-group">
+                                            <li class="list-group-item">
+                                                <strong>ADMIN:</strong> Dashboard, Movimientos, Consulta, Reportes, Administración, Seguridad
+                                            </li>
+                                            <li class="list-group-item">
+                                                <strong>GERENTE:</strong> Dashboard, Movimientos, Consulta, Reportes, Administración
+                                            </li>
+                                            <li class="list-group-item">
+                                                <strong>CAJERO:</strong> Dashboard, Movimientos
+                                            </li>
+                                            <li class="list-group-item">
+                                                <strong>CONSULTA:</strong> Dashboard, Consulta, Reportes
+                                            </li>
+                                        </ul>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <h6>Acciones Permitidas:</h6>
+                                        <ul class="list-group">
+                                            <li class="list-group-item">
+                                                <strong>ADMIN:</strong> Todas las acciones (crear, editar, eliminar, administrar)
+                                            </li>
+                                            <li class="list-group-item">
+                                                <strong>GERENTE:</strong> Ver, crear, editar, generar reportes
+                                            </li>
+                                            <li class="list-group-item">
+                                                <strong>CAJERO:</strong> Ver y crear movimientos
+                                            </li>
+                                            <li class="list-group-item">
+                                                <strong>CONSULTA:</strong> Solo consultar y ver reportes
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
