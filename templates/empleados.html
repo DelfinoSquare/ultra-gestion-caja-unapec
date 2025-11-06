@@ -14,38 +14,59 @@
             <div class="card-body">
                 <form method="POST" action="{{ url_for('agregar_empleado') }}">
                     <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Nombre Completo *</label>
+                            <input type="text" class="form-control" name="nombre" required>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Tipo de Documento *</label>
+                            <select class="form-select" name="tipo_documento" required>
+                                <option value="Cédula">Cédula</option>
+                                <option value="RUC">RUC</option>
+                                <option value="Pasaporte">Pasaporte</option>
+                                <option value="NCF">NCF</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Número de Documento *</label>
+                            <input type="text" class="form-control" name="numero_documento" required>
+                        </div>
+                    </div>
+                    <div class="row">
                         <div class="col-md-4 mb-3">
-                            <label class="form-label">Nombre Completo</label>
-                            <input type="text" class="form-control" name="nombre" placeholder="Nombre y Apellido" required>
+                            <label class="form-label">Teléfono</label>
+                            <input type="text" class="form-control" name="telefono">
                         </div>
-                        <div class="col-md-3 mb-3">
-                            <label class="form-label">Cédula</label>
-                            <input type="text" class="form-control" name="cedula" placeholder="Cédula" required>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Email</label>
+                            <input type="email" class="form-control" name="email">
                         </div>
-                        <div class="col-md-3 mb-3">
-                            <label class="form-label">Tanda Labor</label>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Tanda Labor *</label>
                             <select class="form-select" name="tanda_labor" required>
                                 <option value="Matutina">Matutina</option>
                                 <option value="Vespertina">Vespertina</option>
                                 <option value="Nocturna">Nocturna</option>
-                            </select>
-                        </div>
-                        <div class="col-md-2 mb-3">
-                            <label class="form-label">Estado</label>
-                            <select class="form-select" name="estado" required>
-                                <option value="Activo">Activo</option>
-                                <option value="Inactivo">Inactivo</option>
+                                <option value="Mixta">Mixta</option>
                             </select>
                         </div>
                     </div>
                     <div class="row">
                         <div class="col-md-4 mb-3">
-                            <label class="form-label">Fecha de Ingreso</label>
+                            <label class="form-label">Fecha de Ingreso *</label>
                             <input type="date" class="form-control" name="fecha_ingreso" required>
                         </div>
-                        <div class="col-md-8 mb-3 d-flex align-items-end">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-save me-2"></i>Guardar Empleado
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Estado *</label>
+                            <select class="form-select" name="estado" required>
+                                <option value="Activo">Activo</option>
+                                <option value="Inactivo">Inactivo</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">&nbsp;</label>
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="fas fa-save me-2"></i>Guardar
                             </button>
                         </div>
                     </div>
@@ -66,7 +87,10 @@
                             <tr>
                                 <th>ID</th>
                                 <th>Nombre</th>
-                                <th>Cédula</th>
+                                <th>Tipo Documento</th>
+                                <th>N° Documento</th>
+                                <th>Teléfono</th>
+                                <th>Email</th>
                                 <th>Tanda Labor</th>
                                 <th>Fecha Ingreso</th>
                                 <th>Estado</th>
@@ -78,11 +102,12 @@
                             <tr>
                                 <td>{{ empleado.id }}</td>
                                 <td>{{ empleado.nombre }}</td>
-                                <td>{{ empleado.cedula }}</td>
-                                <td>
-                                    <span class="badge bg-secondary">{{ empleado.tanda_labor }}</span>
-                                </td>
-                                <td>{{ empleado.fecha_ingreso.strftime('%d/%m/%Y') }}</td>
+                                <td>{{ empleado.tipo_documento }}</td>
+                                <td>{{ empleado.numero_documento }}</td>
+                                <td>{{ empleado.telefono or '-' }}</td>
+                                <td>{{ empleado.email or '-' }}</td>
+                                <td>{{ empleado.tanda_labor }}</td>
+                                <td>{{ empleado.fecha_ingreso.strftime('%Y-%m-%d') }}</td>
                                 <td>
                                     <span class="badge bg-{% if empleado.estado == 'Activo' %}success{% else %}danger{% endif %}">
                                         {{ empleado.estado }}
@@ -110,29 +135,49 @@
                                             <div class="modal-body">
                                                 <div class="row">
                                                     <div class="col-md-6 mb-3">
-                                                        <label class="form-label">Nombre Completo</label>
+                                                        <label class="form-label">Nombre Completo *</label>
                                                         <input type="text" class="form-control" name="nombre" value="{{ empleado.nombre }}" required>
                                                     </div>
-                                                    <div class="col-md-6 mb-3">
-                                                        <label class="form-label">Cédula</label>
-                                                        <input type="text" class="form-control" name="cedula" value="{{ empleado.cedula }}" required>
+                                                    <div class="col-md-3 mb-3">
+                                                        <label class="form-label">Tipo de Documento *</label>
+                                                        <select class="form-select" name="tipo_documento" required>
+                                                            <option value="Cédula" {% if empleado.tipo_documento == 'Cédula' %}selected{% endif %}>Cédula</option>
+                                                            <option value="RUC" {% if empleado.tipo_documento == 'RUC' %}selected{% endif %}>RUC</option>
+                                                            <option value="Pasaporte" {% if empleado.tipo_documento == 'Pasaporte' %}selected{% endif %}>Pasaporte</option>
+                                                            <option value="NCF" {% if empleado.tipo_documento == 'NCF' %}selected{% endif %}>NCF</option>
+                                                        </select>
+                                                    </div>
+                                                    <div class="col-md-3 mb-3">
+                                                        <label class="form-label">Número de Documento *</label>
+                                                        <input type="text" class="form-control" name="numero_documento" value="{{ empleado.numero_documento }}" required>
                                                     </div>
                                                 </div>
                                                 <div class="row">
                                                     <div class="col-md-4 mb-3">
-                                                        <label class="form-label">Tanda Labor</label>
+                                                        <label class="form-label">Teléfono</label>
+                                                        <input type="text" class="form-control" name="telefono" value="{{ empleado.telefono or '' }}">
+                                                    </div>
+                                                    <div class="col-md-4 mb-3">
+                                                        <label class="form-label">Email</label>
+                                                        <input type="email" class="form-control" name="email" value="{{ empleado.email or '' }}">
+                                                    </div>
+                                                    <div class="col-md-4 mb-3">
+                                                        <label class="form-label">Tanda Labor *</label>
                                                         <select class="form-select" name="tanda_labor" required>
                                                             <option value="Matutina" {% if empleado.tanda_labor == 'Matutina' %}selected{% endif %}>Matutina</option>
                                                             <option value="Vespertina" {% if empleado.tanda_labor == 'Vespertina' %}selected{% endif %}>Vespertina</option>
                                                             <option value="Nocturna" {% if empleado.tanda_labor == 'Nocturna' %}selected{% endif %}>Nocturna</option>
+                                                            <option value="Mixta" {% if empleado.tanda_labor == 'Mixta' %}selected{% endif %}>Mixta</option>
                                                         </select>
                                                     </div>
-                                                    <div class="col-md-4 mb-3">
-                                                        <label class="form-label">Fecha de Ingreso</label>
+                                                </div>
+                                                <div class="row">
+                                                    <div class="col-md-6 mb-3">
+                                                        <label class="form-label">Fecha de Ingreso *</label>
                                                         <input type="date" class="form-control" name="fecha_ingreso" value="{{ empleado.fecha_ingreso.strftime('%Y-%m-%d') }}" required>
                                                     </div>
-                                                    <div class="col-md-4 mb-3">
-                                                        <label class="form-label">Estado</label>
+                                                    <div class="col-md-6 mb-3">
+                                                        <label class="form-label">Estado *</label>
                                                         <select class="form-select" name="estado" required>
                                                             <option value="Activo" {% if empleado.estado == 'Activo' %}selected{% endif %}>Activo</option>
                                                             <option value="Inactivo" {% if empleado.estado == 'Inactivo' %}selected{% endif %}>Inactivo</option>
@@ -150,7 +195,7 @@
                             </div>
                             {% else %}
                             <tr>
-                                <td colspan="7" class="text-center text-muted">No hay empleados registrados</td>
+                                <td colspan="10" class="text-center text-muted">No hay empleados registrados</td>
                             </tr>
                             {% endfor %}
                         </tbody>

@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+
+{% block page_title %}Búsqueda Unificada{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-search me-2"></i>Búsqueda de Clientes y Empleados
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="GET" action="{{ url_for('busqueda') }}">
+                    <div class="row">
+                        <div class="col-md-8 mb-3">
+                            <label class="form-label">Buscar por Nombre, Documento, Email o Teléfono</label>
+                            <input type="text" class="form-control" name="q" 
+                                   value="{{ request.args.get('q', '') }}" 
+                                   placeholder="Ej: Juan Pérez, 00112345678, juan@email.com, 809-555-0101..."
+                                   required>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <label class="form-label">Tipo</label>
+                            <select class="form-select" name="tipo">
+                                <option value="">Todos</option>
+                                <option value="cliente" {% if request.args.get('tipo') == 'cliente' %}selected{% endif %}>Clientes</option>
+                                <option value="empleado" {% if request.args.get('tipo') == 'empleado' %}selected{% endif %}>Empleados</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <label class="form-label">&nbsp;</label>
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="fas fa-search me-2"></i>Buscar
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        {% if resultados_clientes or resultados_empleados %}
+        <!-- Resultados de Clientes -->
+        {% if resultados_clientes %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-users me-2"></i>Clientes Encontrados
+                    <span class="badge bg-success ms-2">{{ resultados_clientes|length }} resultados</span>
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Nombre</th>
+                                <th>Tipo Documento</th>
+                                <th>N° Documento</th>
+                                <th>Teléfono</th>
+                                <th>Email</th>
+                                <th>Tipo Cliente</th>
+                                <th>Carrera</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for cliente in resultados_clientes %}
+                            <tr>
+                                <td>
+                                    <strong>{{ cliente.nombre }}</strong>
+                                </td>
+                                <td>{{ cliente.tipo_documento }}</td>
+                                <td>{{ cliente.numero_documento }}</td>
+                                <td>{{ cliente.telefono or '-' }}</td>
+                                <td>{{ cliente.email or '-' }}</td>
+                                <td>{{ cliente.tipo_cliente }}</td>
+                                <td>{{ cliente.carrera }}</td>
+                                <td>
+                                    <span class="badge bg-{% if cliente.estado == 'Activo' %}success{% else %}danger{% endif %}">
+                                        {{ cliente.estado }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('clientes') }}" class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-eye me-1"></i>Ver
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Resultados de Empleados -->
+        {% if resultados_empleados %}
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-user-tie me-2"></i>Empleados Encontrados
+                    <span class="badge bg-info ms-2">{{ resultados_empleados|length }} resultados</span>
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Nombre</th>
+                                <th>Tipo Documento</th>
+                                <th>N° Documento</th>
+                                <th>Teléfono</th>
+                                <th>Email</th>
+                                <th>Tanda Labor</th>
+                                <th>Fecha Ingreso</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for empleado in resultados_empleados %}
+                            <tr>
+                                <td>
+                                    <strong>{{ empleado.nombre }}</strong>
+                                </td>
+                                <td>{{ empleado.tipo_documento }}</td>
+                                <td>{{ empleado.numero_documento }}</td>
+                                <td>{{ empleado.telefono or '-' }}</td>
+                                <td>{{ empleado.email or '-' }}</td>
+                                <td>{{ empleado.tanda_labor }}</td>
+                                <td>{{ empleado.fecha_ingreso.strftime('%Y-%m-%d') }}</td>
+                                <td>
+                                    <span class="badge bg-{% if empleado.estado == 'Activo' %}success{% else %}danger{% endif %}">
+                                        {{ empleado.estado }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('empleados') }}" class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-eye me-1"></i>Ver
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Resumen -->
+        <div class="alert alert-secondary mt-3">
+            <div class="row">
+                <div class="col-md-6">
+                    <strong>Total de Resultados:</strong> 
+                    <span class="badge bg-primary">{{ (resultados_clientes|length) + (resultados_empleados|length) }}</span>
+                </div>
+                <div class="col-md-6 text-end">
+                    <a href="{{ url_for('busqueda') }}" class="btn btn-sm btn-outline-secondary">
+                        <i class="fas fa-refresh me-1"></i>Nueva Búsqueda
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        {% elif request.args.get('q') %}
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">No se encontraron resultados</h5>
+                <p class="text-muted">No hay clientes o empleados que coincidan con "<strong>{{ request.args.get('q') }}</strong>".</p>
+                <p class="text-muted">Intente con otros términos de búsqueda.</p>
+            </div>
+        </div>
+        {% else %}
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">Búsqueda Unificada</h5>
+                <p class="text-muted">Utilice la barra de búsqueda para encontrar clientes y empleados.</p>
+                <div class="row mt-4">
+                    <div class="col-md-6">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h6><i class="fas fa-users me-2 text-primary"></i>Buscar Clientes</h6>
+                                <p class="small text-muted mb-0">Por nombre, cédula, RUC, email o teléfono</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h6><i class="fas fa-user-tie me-2 text-info"></i>Buscar Empleados</h6>
+                                <p class="small text-muted mb-0">Por nombre, documento, email o teléfono</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -39,25 +39,43 @@ class ModalidadPago(db.Model):
 class Cliente(db.Model):
     __tablename__ = 'clientes'
     id = db.Column(db.Integer, primary_key=True)
-    nombre = db.Column(db.String(100), nullable=False)
-    apellido = db.Column(db.String(100), nullable=False)
-    cedula = db.Column(db.String(20), unique=True, nullable=False)
+    nombre = db.Column(db.String(200), nullable=False)
+    tipo_documento = db.Column(db.String(20), nullable=False, default='Cédula')
+    numero_documento = db.Column(db.String(20), nullable=False)
     telefono = db.Column(db.String(20))
     email = db.Column(db.String(100))
+    tipo_cliente = db.Column(db.String(20), nullable=False)
+    carrera = db.Column(db.String(100))
+    fecha_registro = db.Column(db.DateTime, default=db.func.now())
+    estado = db.Column(db.String(20), default='Activo')
     
     movimientos = db.relationship('MovimientoCaja', backref='cliente', lazy=True)
+
+    # Índice único compuesto para evitar duplicados
+    __table_args__ = (
+        db.UniqueConstraint('tipo_documento', 'numero_documento', name='uq_cliente_documento'),
+    )
 
 class Empleado(db.Model):
     __tablename__ = 'empleados'
     id = db.Column(db.Integer, primary_key=True)
-    nombre = db.Column(db.String(100), nullable=False)
-    apellido = db.Column(db.String(100), nullable=False)
-    cedula = db.Column(db.String(20), unique=True, nullable=False)
+    nombre = db.Column(db.String(200), nullable=False)
+    tipo_documento = db.Column(db.String(20), nullable=False, default='Cédula')
+    cedula = db.Column(db.String(20), unique=True, nullable=False)  # Se mantiene por compatibilidad
+    numero_documento = db.Column(db.String(20), nullable=False)  # Nuevo campo unificado
     telefono = db.Column(db.String(20))
     email = db.Column(db.String(100))
-    usuario = db.Column(db.String(50), unique=True, nullable=False)
+    tanda_labor = db.Column(db.String(50), nullable=False)
+    fecha_ingreso = db.Column(db.DateTime, nullable=False)
+    estado = db.Column(db.String(20), default='Activo')
     
     movimientos = db.relationship('MovimientoCaja', backref='empleado', lazy=True)
+    usuarios = db.relationship('Usuario', backref='empleado', lazy=True)
+
+    # Índice único compuesto
+    __table_args__ = (
+        db.UniqueConstraint('tipo_documento', 'numero_documento', name='uq_empleado_documento'),
+    )
 
 class MovimientoCaja(db.Model):
     __tablename__ = 'movimientos_caja'
@@ -70,4 +88,5 @@ class MovimientoCaja(db.Model):
     empleado_id = db.Column(db.Integer, db.ForeignKey('empleados.id'), nullable=False)
     monto = db.Column(db.Float, nullable=False)
     descripcion = db.Column(db.Text)
-    fecha = db.Column(db.DateTime, nullable=False)
+    fecha = db.Column(db.DateTime, nullable=False, default=db.func.now())
+    estado = db.Column(db.String(20), default='Activo')

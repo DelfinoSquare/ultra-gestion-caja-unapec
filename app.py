@@ -45,7 +45,7 @@ class Usuario(UserMixin, db.Model):
     fecha_creacion = db.Column(db.DateTime, default=datetime.now)
     ultimo_acceso = db.Column(db.DateTime)
 
-# Modelos de Negocio
+# Modelos de Negocio (Actualizados)
 class TipoDocumento(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     descripcion = db.Column(db.String(200), nullable=False)
@@ -74,21 +74,37 @@ class ModalidadPago(db.Model):
 class Cliente(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nombre = db.Column(db.String(200), nullable=False)
+    tipo_documento = db.Column(db.String(20), nullable=False, default='Cédula')
+    numero_documento = db.Column(db.String(20), nullable=False)
+    telefono = db.Column(db.String(20))
+    email = db.Column(db.String(100))
     tipo_cliente = db.Column(db.String(20), nullable=False)
     carrera = db.Column(db.String(100))
     fecha_registro = db.Column(db.DateTime, default=datetime.now)
     estado = db.Column(db.String(20), default='Activo')
     movimientos = db.relationship('MovimientoCaja', backref='cliente', lazy=True, cascade='all, delete-orphan')
 
+    __table_args__ = (
+        db.UniqueConstraint('tipo_documento', 'numero_documento', name='uq_cliente_documento'),
+    )
+
 class Empleado(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nombre = db.Column(db.String(200), nullable=False)
+    tipo_documento = db.Column(db.String(20), nullable=False, default='Cédula')
     cedula = db.Column(db.String(20), unique=True, nullable=False)
+    numero_documento = db.Column(db.String(20), nullable=False)
+    telefono = db.Column(db.String(20))
+    email = db.Column(db.String(100))
     tanda_labor = db.Column(db.String(50), nullable=False)
     fecha_ingreso = db.Column(db.DateTime, nullable=False)
     estado = db.Column(db.String(20), default='Activo')
     movimientos = db.relationship('MovimientoCaja', backref='empleado', lazy=True, cascade='all, delete-orphan')
     usuarios = db.relationship('Usuario', backref='empleado', lazy=True)
+
+    __table_args__ = (
+        db.UniqueConstraint('tipo_documento', 'numero_documento', name='uq_empleado_documento'),
+    )
 
 class MovimientoCaja(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -106,7 +122,7 @@ class MovimientoCaja(db.Model):
 def load_user(user_id):
     return Usuario.query.get(int(user_id))
 
-# Sistema de Validaciones
+# Sistema de Validaciones MEJORADO con algoritmos oficiales
 class Validator:
     @staticmethod
     def validar_texto(texto, campo, min_len=1, max_len=200):
@@ -140,11 +156,158 @@ class Validator:
     
     @staticmethod
     def validar_cedula(cedula):
+        """
+        Valida cédula dominicana - Algoritmo adaptado del código C#
+        Formato: 001-1234567-8 o 00112345678
+        """
         if not cedula or not cedula.strip():
             return False, "La cédula no puede estar vacía"
-        if len(cedula.strip()) < 11:
-            return False, "La cédula debe tener al menos 11 caracteres"
+        
+        # Limpiar guiones y espacios
+        vcCedula = cedula.replace('-', '').replace(' ', '')
+        pLongCed = len(vcCedula.strip())
+        
+        # Validar longitud
+        if pLongCed != 11:
+            return False, "La cédula debe tener 11 dígitos"
+        
+        # Validar que sean solo números
+        if not vcCedula.isdigit():
+            return False, "La cédula debe contener solo números"
+        
+        # Algoritmo de validación
+        vnTotal = 0
+        digitoMult = [1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1]
+        
+        for vDig in range(1, pLongCed + 1):
+            vCalculo = int(vcCedula[vDig - 1]) * digitoMult[vDig - 1]
+            if vCalculo < 10:
+                vnTotal += vCalculo
+            else:
+                vCalculo_str = str(vCalculo)
+                vnTotal += int(vCalculo_str[0]) + int(vCalculo_str[1])
+        
+        if vnTotal % 10 == 0:
+            return True, "OK"
+        else:
+            return False, "Cédula inválida - verificación fallida"
+    
+    @staticmethod
+    def validar_ruc(ruc):
+        """
+        Valida RUC dominicano - Algoritmo adaptado del código C#
+        Formato: 130000000 o 1-30-00000-8
+        """
+        if not ruc or not ruc.strip():
+            return False, "El RUC no puede estar vacío"
+        
+        # Limpiar guiones y espacios
+        ruc_limpio = ruc.replace('-', '').replace(' ', '')
+        
+        # Validar longitud
+        if len(ruc_limpio) != 9:
+            return False, "El RUC debe tener 9 dígitos"
+        
+        # Validar que sean solo números
+        if not ruc_limpio.isdigit():
+            return False, "El RUC debe contener solo números"
+        
+        # Algoritmo de validación RNC
+        peso = [7, 9, 8, 6, 5, 4, 3, 2]
+        suma = 0
+        
+        # Verificar que los primeros 8 caracteres sean dígitos
+        for i in range(8):
+            if not ruc_limpio[i].isdigit():
+                return False, "RUC inválido - formato incorrecto"
+            
+            suma += int(ruc_limpio[i]) * peso[i]
+        
+        division = suma // 11
+        resto = suma - (division * 11)
+        digito = 0
+        
+        if resto == 0:
+            digito = 2
+        elif resto == 1:
+            digito = 1
+        else:
+            digito = 11 - resto
+        
+        if digito != int(ruc_limpio[8]):
+            return False, "RUC inválido - dígito verificador incorrecto"
+        
         return True, "OK"
+    
+    @staticmethod
+    def validar_pasaporte(pasaporte):
+        """
+        Valida formato básico de pasaporte
+        """
+        if not pasaporte or not pasaporte.strip():
+            return False, "El pasaporte no puede estar vacío"
+        
+        pasaporte_limpio = pasaporte.strip().upper()
+        
+        # Longitud típica de pasaportes
+        if len(pasaporte_limpio) < 6 or len(pasaporte_limpio) > 9:
+            return False, "El pasaporte debe tener entre 6 y 9 caracteres"
+        
+        # Debe empezar con letra y contener letras/números
+        if not pasaporte_limpio[0].isalpha():
+            return False, "El pasaporte debe empezar con una letra"
+        
+        # Validar caracteres alfanuméricos
+        if not pasaporte_limpio.isalnum():
+            return False, "El pasaporte solo puede contener letras y números"
+        
+        return True, "OK"
+    
+    @staticmethod
+    def validar_ncf(ncf):
+        """
+        Valida NCF (Número de Comprobante Fiscal) dominicano
+        Formato: E310000000005
+        """
+        if not ncf or not ncf.strip():
+            return False, "El NCF no puede estar vacío"
+        
+        ncf_limpio = ncf.strip().upper()
+        
+        # Longitud fija
+        if len(ncf_limpio) != 13:
+            return False, "El NCF debe tener 13 caracteres"
+        
+        # Validar estructura: Letra + 2 dígitos + 9 dígitos + letra
+        if (not ncf_limpio[0].isalpha() or 
+            not ncf_limpio[1:3].isdigit() or 
+            not ncf_limpio[3:12].isdigit() or 
+            not ncf_limpio[12].isalpha()):
+            return False, "Formato de NCF inválido"
+        
+        # Validar tipo de comprobante (primera letra)
+        tipos_validos = ['B', 'E', 'F', 'C']  # Facturas, Gastos, etc.
+        if ncf_limpio[0] not in tipos_validos:
+            return False, "Tipo de comprobante fiscal inválido"
+        
+        return True, "OK"
+    
+    @staticmethod
+    def validar_documento_por_tipo(tipo_documento, numero_documento):
+        """
+        Valida cualquier documento según su tipo
+        """
+        if tipo_documento == "Cédula":
+            return Validator.validar_cedula(numero_documento)
+        elif tipo_documento == "RUC":
+            return Validator.validar_ruc(numero_documento)
+        elif tipo_documento == "Pasaporte":
+            return Validator.validar_pasaporte(numero_documento)
+        elif tipo_documento in ["NCF", "Comprobante Fiscal"]:
+            return Validator.validar_ncf(numero_documento)
+        else:
+            # Para otros tipos de documentos, validación básica
+            return Validator.validar_texto(numero_documento, "Documento", 2, 50)
     
     @staticmethod
     def validar_email(email):
@@ -155,6 +318,57 @@ class Validator:
         if re.match(pattern, email):
             return True, "OK"
         return False, "El formato del email no es válido"
+
+# Funciones de validación completas
+def validar_empleado_completo(data):
+    """Valida todos los campos de un empleado"""
+    validaciones = [
+        Validator.validar_texto(data.get('nombre'), 'Nombre', 2, 200),
+        Validator.validar_texto(data.get('tipo_documento'), 'Tipo de documento', 2, 20),
+        Validator.validar_documento_por_tipo(data.get('tipo_documento'), data.get('numero_documento')),
+        Validator.validar_texto(data.get('tanda_labor'), 'Tanda labor', 2, 50),
+        Validator.validar_fecha(data.get('fecha_ingreso'), 'Fecha de ingreso')
+    ]
+    
+    # Validar email si está presente
+    email = data.get('email')
+    if email and email.strip():
+        val_email = Validator.validar_email(email)
+        if not val_email[0]:
+            return False, val_email[1]
+    
+    for es_valido, mensaje in validaciones:
+        if not es_valido:
+            return False, mensaje
+    
+    return True, "Empleado válido"
+
+def validar_cliente_completo(data):
+    """Valida todos los campos de un cliente"""
+    validaciones = [
+        Validator.validar_texto(data.get('nombre'), 'Nombre', 2, 200),
+        Validator.validar_texto(data.get('tipo_documento'), 'Tipo de documento', 2, 20),
+        Validator.validar_documento_por_tipo(data.get('tipo_documento'), data.get('numero_documento')),
+        Validator.validar_texto(data.get('carrera'), 'Carrera/Departamento', 2, 100)
+    ]
+    
+    # Validar tipo de cliente
+    tipo_cliente = data.get('tipo_cliente')
+    if tipo_cliente not in ['Estudiante', 'Empleado', 'Externo']:
+        return False, "Tipo de cliente inválido"
+    
+    # Validar email si está presente
+    email = data.get('email')
+    if email and email.strip():
+        val_email = Validator.validar_email(email)
+        if not val_email[0]:
+            return False, val_email[1]
+    
+    for es_valido, mensaje in validaciones:
+        if not es_valido:
+            return False, mensaje
+    
+    return True, "Cliente válido"
 
 # Función para validar movimientos
 def validar_movimiento(data):
@@ -274,7 +488,7 @@ def login():
         
         if usuario and check_password_hash(usuario.password, password):
             login_user(usuario)
-            usuario.ultimo_acceso = datetime.now()  # ← datetime está importado al inicio
+            usuario.ultimo_acceso = datetime.now()
             db.session.commit()
             
             flash(f'Bienvenido {usuario.username}!', 'success')
@@ -467,8 +681,6 @@ def eliminar_tipo_documento(id):
     flash(message, 'success' if success else 'danger')
     return redirect(url_for('tipos_documentos'))
 
-
-
 # CRUD Servicios
 @app.route('/servicios')
 @gerente_required
@@ -583,7 +795,7 @@ def eliminar_modalidad_pago(id):
     flash(message, 'success' if success else 'danger')
     return redirect(url_for('modalidades_pago'))
 
-# CRUD Clientes
+# CRUD Clientes - ACTUALIZADO CON NUEVOS CAMPOS
 @app.route('/clientes')
 @gerente_required
 def clientes():
@@ -594,37 +806,51 @@ def clientes():
 @gerente_required
 def agregar_cliente():
     nombre = request.form['nombre']
+    tipo_documento = request.form['tipo_documento']
+    numero_documento = request.form['numero_documento']
+    telefono = request.form.get('telefono', '')
+    email = request.form.get('email', '')
     tipo_cliente = request.form['tipo_cliente']
     carrera = request.form['carrera']
     estado = request.form['estado']
     
-    # Validaciones
-    val_nombre = Validator.validar_texto(nombre, 'Nombre', 2, 200)
-    val_carrera = Validator.validar_texto(carrera, 'Carrera/Departamento', 2, 100)
+    # Validaciones completas
+    datos_cliente = {
+        'nombre': nombre,
+        'tipo_documento': tipo_documento,
+        'numero_documento': numero_documento,
+        'carrera': carrera,
+        'tipo_cliente': tipo_cliente,
+        'email': email
+    }
     
-    if not val_nombre[0]:
-        flash(val_nombre[1], 'danger')
+    es_valido, mensaje = validar_cliente_completo(datos_cliente)
+    if not es_valido:
+        flash(mensaje, 'danger')
         return redirect(url_for('clientes'))
     
-    if not val_carrera[0]:
-        flash(val_carrera[1], 'danger')
-        return redirect(url_for('clientes'))
+    # Verificar si el documento ya existe
+    cliente_existente = Cliente.query.filter_by(
+        tipo_documento=tipo_documento,
+        numero_documento=numero_documento.replace('-', '').replace(' ', '')
+    ).first()
     
-    # Verificar si el cliente ya existe (por nombre)
-    cliente_existente = Cliente.query.filter_by(nombre=nombre).first()
     if cliente_existente:
-        flash('Ya existe un cliente con ese nombre', 'warning')
+        flash('Ya existe un cliente con ese documento', 'warning')
         return redirect(url_for('clientes'))
-    
-    nuevo_cliente = Cliente(
-        nombre=nombre.strip(),
-        tipo_cliente=tipo_cliente,
-        carrera=carrera.strip(),
-        estado=estado,
-        fecha_registro=datetime.now()
-    )
     
     try:
+        nuevo_cliente = Cliente(
+            nombre=nombre.strip(),
+            tipo_documento=tipo_documento,
+            numero_documento=numero_documento.replace('-', '').replace(' ', ''),
+            telefono=telefono.strip(),
+            email=email.strip(),
+            tipo_cliente=tipo_cliente,
+            carrera=carrera.strip(),
+            estado=estado,
+            fecha_registro=datetime.now()
+        )
         db.session.add(nuevo_cliente)
         db.session.commit()
         flash('Cliente agregado correctamente', 'success')
@@ -638,12 +864,58 @@ def agregar_cliente():
 @gerente_required
 def editar_cliente(id):
     cliente = Cliente.query.get_or_404(id)
-    cliente.nombre = request.form['nombre']
-    cliente.tipo_cliente = request.form['tipo_cliente']
-    cliente.carrera = request.form['carrera']
-    cliente.estado = request.form['estado']
-    db.session.commit()
-    flash('Cliente actualizado correctamente', 'success')
+    
+    nombre = request.form['nombre']
+    tipo_documento = request.form['tipo_documento']
+    numero_documento = request.form['numero_documento']
+    telefono = request.form.get('telefono', '')
+    email = request.form.get('email', '')
+    tipo_cliente = request.form['tipo_cliente']
+    carrera = request.form['carrera']
+    estado = request.form['estado']
+    
+    # Validaciones completas
+    datos_cliente = {
+        'nombre': nombre,
+        'tipo_documento': tipo_documento,
+        'numero_documento': numero_documento,
+        'carrera': carrera,
+        'tipo_cliente': tipo_cliente,
+        'email': email
+    }
+    
+    es_valido, mensaje = validar_cliente_completo(datos_cliente)
+    if not es_valido:
+        flash(mensaje, 'danger')
+        return redirect(url_for('clientes'))
+    
+    # Verificar si el documento ya existe (excluyendo el actual)
+    cliente_existente = Cliente.query.filter(
+        Cliente.tipo_documento == tipo_documento,
+        Cliente.numero_documento == numero_documento.replace('-', '').replace(' ', ''),
+        Cliente.id != id
+    ).first()
+    
+    if cliente_existente:
+        flash('Ya existe otro cliente con ese documento', 'warning')
+        return redirect(url_for('clientes'))
+    
+    try:
+        cliente.nombre = nombre.strip()
+        cliente.tipo_documento = tipo_documento
+        cliente.numero_documento = numero_documento.replace('-', '').replace(' ', '')
+        cliente.telefono = telefono.strip()
+        cliente.email = email.strip()
+        cliente.tipo_cliente = tipo_cliente
+        cliente.carrera = carrera.strip()
+        cliente.estado = estado
+        
+        db.session.commit()
+        flash('Cliente actualizado correctamente', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error al actualizar cliente: {str(e)}', 'danger')
+    
     return redirect(url_for('clientes'))
 
 @app.route('/eliminar_cliente/<int:id>')
@@ -653,7 +925,7 @@ def eliminar_cliente(id):
     flash(message, 'success' if success else 'danger')
     return redirect(url_for('clientes'))
 
-# CRUD Empleados
+# CRUD Empleados - ACTUALIZADO CON NUEVOS CAMPOS
 @app.route('/empleados')
 @gerente_required
 def empleados():
@@ -664,52 +936,118 @@ def empleados():
 @gerente_required
 def agregar_empleado():
     nombre = request.form['nombre']
-    cedula = request.form['cedula']
+    tipo_documento = request.form['tipo_documento']
+    numero_documento = request.form['numero_documento']
+    telefono = request.form.get('telefono', '')
+    email = request.form.get('email', '')
     tanda_labor = request.form['tanda_labor']
-    fecha_ingreso = datetime.strptime(request.form['fecha_ingreso'], '%Y-%m-%d')
+    fecha_ingreso = request.form['fecha_ingreso']
     estado = request.form['estado']
     
-    # Validaciones
-    val_nombre = Validator.validar_texto(nombre, 'Nombre', 2, 200)
-    val_cedula = Validator.validar_cedula(cedula)
+    # Validaciones completas
+    datos_empleado = {
+        'nombre': nombre,
+        'tipo_documento': tipo_documento,
+        'numero_documento': numero_documento,
+        'tanda_labor': tanda_labor,
+        'fecha_ingreso': fecha_ingreso,
+        'email': email
+    }
     
-    if not val_nombre[0]:
-        flash(val_nombre[1], 'danger')
+    es_valido, mensaje = validar_empleado_completo(datos_empleado)
+    if not es_valido:
+        flash(mensaje, 'danger')
         return redirect(url_for('empleados'))
     
-    if not val_cedula[0]:
-        flash(val_cedula[1], 'danger')
-        return redirect(url_for('empleados'))
+    # Verificar si el documento ya existe
+    empleado_existente = Empleado.query.filter_by(
+        tipo_documento=tipo_documento,
+        numero_documento=numero_documento.replace('-', '').replace(' ', '')
+    ).first()
     
-    # Verificar si la cédula ya existe
-    empleado_existente = Empleado.query.filter_by(cedula=cedula).first()
     if empleado_existente:
-        flash('Ya existe un empleado con esa cédula', 'warning')
+        flash('Ya existe un empleado con ese documento', 'warning')
         return redirect(url_for('empleados'))
     
-    nuevo_empleado = Empleado(
-        nombre=nombre,
-        cedula=cedula,
-        tanda_labor=tanda_labor,
-        fecha_ingreso=fecha_ingreso,
-        estado=estado
-    )
-    db.session.add(nuevo_empleado)
-    db.session.commit()
-    flash('Empleado agregado correctamente', 'success')
+    try:
+        nuevo_empleado = Empleado(
+            nombre=nombre.strip(),
+            tipo_documento=tipo_documento,
+            cedula=numero_documento.replace('-', '').replace(' ', '') if tipo_documento == 'Cédula' else '',
+            numero_documento=numero_documento.replace('-', '').replace(' ', ''),
+            telefono=telefono.strip(),
+            email=email.strip(),
+            tanda_labor=tanda_labor,
+            fecha_ingreso=datetime.strptime(fecha_ingreso, '%Y-%m-%d'),
+            estado=estado
+        )
+        db.session.add(nuevo_empleado)
+        db.session.commit()
+        flash('Empleado agregado correctamente', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error al guardar el empleado: {str(e)}', 'danger')
+    
     return redirect(url_for('empleados'))
 
 @app.route('/editar_empleado/<int:id>', methods=['POST'])
 @gerente_required
 def editar_empleado(id):
     empleado = Empleado.query.get_or_404(id)
-    empleado.nombre = request.form['nombre']
-    empleado.cedula = request.form['cedula']
-    empleado.tanda_labor = request.form['tanda_labor']
-    empleado.fecha_ingreso = datetime.strptime(request.form['fecha_ingreso'], '%Y-%m-%d')
-    empleado.estado = request.form['estado']
-    db.session.commit()
-    flash('Empleado actualizado correctamente', 'success')
+    
+    nombre = request.form['nombre']
+    tipo_documento = request.form['tipo_documento']
+    numero_documento = request.form['numero_documento']
+    telefono = request.form.get('telefono', '')
+    email = request.form.get('email', '')
+    tanda_labor = request.form['tanda_labor']
+    fecha_ingreso = request.form['fecha_ingreso']
+    estado = request.form['estado']
+    
+    # Validaciones completas
+    datos_empleado = {
+        'nombre': nombre,
+        'tipo_documento': tipo_documento,
+        'numero_documento': numero_documento,
+        'tanda_labor': tanda_labor,
+        'fecha_ingreso': fecha_ingreso,
+        'email': email
+    }
+    
+    es_valido, mensaje = validar_empleado_completo(datos_empleado)
+    if not es_valido:
+        flash(mensaje, 'danger')
+        return redirect(url_for('empleados'))
+    
+    # Verificar si el documento ya existe (excluyendo el actual)
+    empleado_existente = Empleado.query.filter(
+        Empleado.tipo_documento == tipo_documento,
+        Empleado.numero_documento == numero_documento.replace('-', '').replace(' ', ''),
+        Empleado.id != id
+    ).first()
+    
+    if empleado_existente:
+        flash('Ya existe otro empleado con ese documento', 'warning')
+        return redirect(url_for('empleados'))
+    
+    try:
+        empleado.nombre = nombre.strip()
+        empleado.tipo_documento = tipo_documento
+        empleado.numero_documento = numero_documento.replace('-', '').replace(' ', '')
+        if tipo_documento == 'Cédula':
+            empleado.cedula = numero_documento.replace('-', '').replace(' ', '')
+        empleado.telefono = telefono.strip()
+        empleado.email = email.strip()
+        empleado.tanda_labor = tanda_labor
+        empleado.fecha_ingreso = datetime.strptime(fecha_ingreso, '%Y-%m-%d')
+        empleado.estado = estado
+        
+        db.session.commit()
+        flash('Empleado actualizado correctamente', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error al actualizar empleado: {str(e)}', 'danger')
+    
     return redirect(url_for('empleados'))
 
 @app.route('/eliminar_empleado/<int:id>')
@@ -839,16 +1177,39 @@ def eliminar_movimiento(id):
     flash(message, 'success' if success else 'danger')
     return redirect(url_for('movimientos'))
 
-# Consultas
+
+# Consultas Simplificadas
 @app.route('/consulta')
 @consulta_required
 def consulta():
     movimientos = []
-    clientes = Cliente.query.all()
-    servicios = Servicio.query.all()
-    tipos_documentos = TipoDocumento.query.all()
-    formas_pago = FormaPago.query.all()
-    empleados = Empleado.query.all()
+    
+    # Obtener parámetros de búsqueda simplificados
+    nombre_cliente = request.args.get('nombre_cliente', '').strip()
+    fecha_desde = request.args.get('fecha_desde')
+    fecha_hasta = request.args.get('fecha_hasta')
+    
+    # Construir query base
+    query = MovimientoCaja.query
+    
+    # Aplicar filtros de manera flexible
+    if nombre_cliente:
+        # Buscar por nombre del cliente (búsqueda parcial)
+        query = query.join(Cliente).filter(Cliente.nombre.ilike(f'%{nombre_cliente}%'))
+    
+    if fecha_desde:
+        query = query.filter(MovimientoCaja.fecha_movimiento >= fecha_desde)
+    
+    if fecha_hasta:
+        query = query.filter(MovimientoCaja.fecha_movimiento <= fecha_hasta)
+        
+    movimientos = query.order_by(MovimientoCaja.fecha_movimiento.desc()).all()
+    
+    return render_template('consulta.html', 
+                         movimientos=movimientos,
+                         nombre_cliente=nombre_cliente,
+                         fecha_desde=fecha_desde,
+                         fecha_hasta=fecha_hasta)
     
     # Obtener todos los parámetros de filtro
     cliente_id = request.args.get('cliente_id', type=int)
@@ -896,6 +1257,55 @@ def consulta():
                          tipos_documentos=tipos_documentos,
                          formas_pago=formas_pago,
                          empleados=empleados)
+
+# Búsqueda Unificada de Clientes y Empleados
+@app.route('/busqueda')
+@login_required
+def busqueda():
+    query = request.args.get('q', '').strip()
+    tipo = request.args.get('tipo', '')
+    
+    resultados_clientes = []
+    resultados_empleados = []
+    
+    if query:
+        # Búsqueda en Clientes
+        if not tipo or tipo == 'cliente':
+            clientes_query = Cliente.query
+            
+            # Buscar en múltiples campos
+            resultados_clientes = clientes_query.filter(
+                db.or_(
+                    Cliente.nombre.ilike(f'%{query}%'),
+                    Cliente.numero_documento.ilike(f'%{query}%'),
+                    Cliente.telefono.ilike(f'%{query}%'),
+                    Cliente.email.ilike(f'%{query}%'),
+                    Cliente.carrera.ilike(f'%{query}%')
+                )
+            ).order_by(Cliente.nombre).all()
+        
+        # Búsqueda en Empleados
+        if not tipo or tipo == 'empleado':
+            empleados_query = Empleado.query
+            
+            # Buscar en múltiples campos
+            resultados_empleados = empleados_query.filter(
+                db.or_(
+                    Empleado.nombre.ilike(f'%{query}%'),
+                    Empleado.numero_documento.ilike(f'%{query}%'),
+                    Empleado.cedula.ilike(f'%{query}%'),
+                    Empleado.telefono.ilike(f'%{query}%'),
+                    Empleado.email.ilike(f'%{query}%'),
+                    Empleado.tanda_labor.ilike(f'%{query}%')
+                )
+            ).order_by(Empleado.nombre).all()
+    
+    return render_template('busqueda.html',
+                         resultados_clientes=resultados_clientes,
+                         resultados_empleados=resultados_empleados,
+                         query=query,
+                         tipo=tipo)
+
 
 # Reportes
 @app.route('/reporte')
