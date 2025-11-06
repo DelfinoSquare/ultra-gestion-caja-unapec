@@ -3,239 +3,295 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Sistema de Caja - Unapec{% endblock %}</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <title>{% block page_title %}Sistema de Caja UNAPEC{% endblock %}</title>
+    
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    
     <style>
-        .navbar-brand { font-weight: bold; }
-        .sidebar { min-height: calc(100vh - 56px); }
-        .stat-card { transition: transform 0.2s; }
-        .stat-card:hover { transform: translateY(-5px); }
-        .table-actions { white-space: nowrap; }
-        .user-menu { cursor: pointer; }
-        .sidebar .nav-link { 
-            color: #495057; 
-            padding: 0.75rem 1rem;
-            border-radius: 0.25rem;
-            margin-bottom: 0.25rem;
+        .sidebar {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
-        .sidebar .nav-link:hover { 
-            background-color: #e9ecef; 
-            color: #007bff;
+        .sidebar .nav-link {
+            color: #fff;
+            padding: 12px 20px;
+            margin: 2px 0;
+            border-radius: 8px;
+            transition: all 0.3s;
         }
-        .sidebar .nav-link.active { 
-            background-color: #007bff; 
-            color: white;
+        .sidebar .nav-link:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateX(5px);
         }
-        .sidebar-heading {
-            font-size: 0.75rem;
-            font-weight: 600;
+        .sidebar .nav-link.active {
+            background: rgba(255, 255, 255, 0.2);
+            font-weight: bold;
+        }
+        .navbar-brand {
+            font-weight: bold;
+            font-size: 1.5rem;
+        }
+        .table-actions {
+            white-space: nowrap;
+            width: 1%;
+        }
+        .main-content {
+            background-color: #f8f9fa;
+            min-height: 100vh;
+        }
+        .card {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        .card-header {
+            background: white;
+            border-bottom: 2px solid #e9ecef;
+            border-radius: 12px 12px 0 0 !important;
+            padding: 15px 20px;
+        }
+        .user-info {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 10px;
+            margin: 10px 0;
         }
     </style>
 </head>
 <body>
-    {% if current_user.is_authenticated %}
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-        <div class="container">
-            <a class="navbar-brand" href="{{ url_for('index') }}">
-                <i class="fas fa-cash-register me-2"></i>Sistema de Caja Unapec
-            </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav ms-auto">
-                    <li class="nav-item dropdown user-menu">
-                        <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
-                            <i class="fas fa-user me-1"></i>{{ current_user.username }}
-                            <span class="badge bg-light text-dark ms-1">{{ current_user.rol.nombre }}</span>
-                        </a>
-                        <ul class="dropdown-menu dropdown-menu-end">
-                            <li><a class="dropdown-item" href="{{ url_for('perfil') }}">
-                                <i class="fas fa-user-circle me-2"></i>Mi Perfil
-                            </a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="{{ url_for('logout') }}">
-                                <i class="fas fa-sign-out-alt me-2"></i>Cerrar Sesión
-                            </a></li>
-                        </ul>
-                    </li>
-                </ul>
-            </div>
-        </div>
-    </nav>
-
     <div class="container-fluid">
         <div class="row">
             <!-- Sidebar -->
-            <div class="col-md-3 col-lg-2 bg-light sidebar">
+            <div class="col-md-3 col-lg-2 sidebar d-md-block collapse">
                 <div class="position-sticky pt-3">
-                    <h6 class="sidebar-heading d-flex justify-content-between align-items-center px-3 mt-4 mb-1 text-muted text-uppercase">
-                        <span>Navegación</span>
-                    </h6>
+                    <!-- Logo y Nombre del Sistema -->
+                    <div class="text-center mb-4">
+                        <h4 class="text-white">
+                            <i class="fas fa-cash-register me-2"></i>
+                            Caja UNAPEC
+                        </h4>
+                        <p class="text-white-50 small">Sistema de Gestión</p>
+                    </div>
+
+                    <!-- Información del Usuario -->
+                    {% if current_user.is_authenticated %}
+                    <div class="user-info">
+                        <div class="text-white small">
+                            <i class="fas fa-user me-2"></i>
+                            <strong>{{ current_user.username }}</strong>
+                        </div>
+                        <div class="text-white-50 small">
+                            <i class="fas fa-shield-alt me-2"></i>
+                            {{ current_user.rol.nombre }}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Menú de Navegación -->
                     <ul class="nav flex-column">
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('index') }}">
+                            <a class="nav-link {% if request.endpoint == 'index' %}active{% endif %}" href="{{ url_for('index') }}">
                                 <i class="fas fa-home me-2"></i>Dashboard
                             </a>
                         </li>
-                        
-                        {% if current_user.rol.nombre in ['ADMIN', 'GERENTE', 'CAJERO'] %}
+
+                        <!-- Módulo de Búsqueda (Siempre visible) -->
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('movimientos') }}">
+                            <a class="nav-link {% if request.endpoint == 'busqueda' %}active{% endif %}" href="{{ url_for('busqueda') }}">
+                                <i class="fas fa-search me-2"></i>Búsqueda
+                            </a>
+                        </li>
+
+                        <!-- Módulo de Movimientos -->
+                        {% if current_user.is_authenticated and current_user.rol.nombre in ['ADMIN', 'GERENTE', 'CAJERO'] %}
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'movimientos' %}active{% endif %}" href="{{ url_for('movimientos') }}">
                                 <i class="fas fa-exchange-alt me-2"></i>Movimientos
                             </a>
                         </li>
                         {% endif %}
-                        
-                        {% if current_user.rol.nombre in ['ADMIN', 'GERENTE', 'CONSULTA'] %}
+
+                        <!-- Módulo de Consultas -->
+                        {% if current_user.is_authenticated and current_user.rol.nombre in ['ADMIN', 'GERENTE', 'CONSULTA'] %}
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('consulta') }}">
-                                <i class="fas fa-search me-2"></i>Consulta
+                            <a class="nav-link {% if request.endpoint == 'consulta' %}active{% endif %}" href="{{ url_for('consulta') }}">
+                                <i class="fas fa-list me-2"></i>Consulta
                             </a>
                         </li>
+                        {% endif %}
+
+                        <!-- Módulo de Reportes -->
+                        {% if current_user.is_authenticated and current_user.rol.nombre in ['ADMIN', 'GERENTE', 'CONSULTA'] %}
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('reporte') }}">
+                            <a class="nav-link {% if request.endpoint == 'reporte' %}active{% endif %}" href="{{ url_for('reporte') }}">
                                 <i class="fas fa-chart-bar me-2"></i>Reportes
                             </a>
                         </li>
                         {% endif %}
 
-                        {% if current_user.rol.nombre in ['ADMIN', 'GERENTE'] %}
-                        <h6 class="sidebar-heading d-flex justify-content-between align-items-center px-3 mt-4 mb-1 text-muted text-uppercase">
-                            <span>Administración</span>
-                        </h6>
-                        <ul class="nav flex-column">
-                            <li class="nav-item">
-                                <a class="nav-link" href="{{ url_for('tipos_documentos') }}">
-                                    <i class="fas fa-file-invoice me-2"></i>Tipos de Documentos
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" href="{{ url_for('servicios') }}">
-                                    <i class="fas fa-concierge-bell me-2"></i>Servicios
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" href="{{ url_for('formas_pago') }}">
-                                    <i class="fas fa-credit-card me-2"></i>Formas de Pago
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" href="{{ url_for('modalidades_pago') }}">
-                                    <i class="fas fa-calendar-alt me-2"></i>Modalidades de Pago
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" href="{{ url_for('clientes') }}">
-                                    <i class="fas fa-users me-2"></i>Clientes
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" href="{{ url_for('empleados') }}">
-                                    <i class="fas fa-user-tie me-2"></i>Empleados
-                                </a>
-                            </li>
-                        </ul>
+                        <!-- Separador para Administración -->
+                        {% if current_user.is_authenticated and current_user.rol.nombre in ['ADMIN', 'GERENTE'] %}
+                        <li class="nav-item mt-3">
+                            <small class="text-white-50 px-3">ADMINISTRACIÓN</small>
+                        </li>
+
+                        <!-- Gestión de Clientes -->
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'clientes' %}active{% endif %}" href="{{ url_for('clientes') }}">
+                                <i class="fas fa-users me-2"></i>Clientes
+                            </a>
+                        </li>
+
+                        <!-- Gestión de Empleados -->
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'empleados' %}active{% endif %}" href="{{ url_for('empleados') }}">
+                                <i class="fas fa-user-tie me-2"></i>Empleados
+                            </a>
+                        </li>
+
+                        <!-- Configuraciones -->
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                                <i class="fas fa-cog me-2"></i>Configuración
+                            </a>
+                            <ul class="dropdown-menu">
+                                <li>
+                                    <a class="dropdown-item" href="{{ url_for('tipos_documentos') }}">
+                                        <i class="fas fa-file-alt me-2"></i>Tipos de Documento
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" href="{{ url_for('servicios') }}">
+                                        <i class="fas fa-concierge-bell me-2"></i>Servicios
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" href="{{ url_for('formas_pago') }}">
+                                        <i class="fas fa-money-bill-wave me-2"></i>Formas de Pago
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" href="{{ url_for('modalidades_pago') }}">
+                                        <i class="fas fa-credit-card me-2"></i>Modalidades de Pago
+                                    </a>
+                                </li>
+                            </ul>
+                        </li>
                         {% endif %}
 
-                        {% if current_user.rol.nombre == 'ADMIN' %}
-                        <h6 class="sidebar-heading d-flex justify-content-between align-items-center px-3 mt-4 mb-1 text-muted text-uppercase">
-                            <span>Seguridad</span>
-                        </h6>
-                        <ul class="nav flex-column">
-                            <li class="nav-item">
-                                <a class="nav-link" href="{{ url_for('admin_usuarios') }}">
-                                    <i class="fas fa-users-cog me-2"></i>Usuarios
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" href="{{ url_for('admin_roles') }}">
-                                    <i class="fas fa-shield-alt me-2"></i>Roles
-                                </a>
-                            </li>
-                        </ul>
+                        <!-- Módulo de Seguridad (Solo ADMIN) -->
+                        {% if current_user.is_authenticated and current_user.rol.nombre == 'ADMIN' %}
+                        <li class="nav-item mt-3">
+                            <small class="text-white-50 px-3">SEGURIDAD</small>
+                        </li>
+
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'admin_usuarios' %}active{% endif %}" href="{{ url_for('admin_usuarios') }}">
+                                <i class="fas fa-user-shield me-2"></i>Usuarios
+                            </a>
+                        </li>
+
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'admin_roles' %}active{% endif %}" href="{{ url_for('admin_roles') }}">
+                                <i class="fas fa-users-cog me-2"></i>Roles
+                            </a>
+                        </li>
                         {% endif %}
+
+                        <!-- Perfil y Cerrar Sesión -->
+                        <li class="nav-item mt-3">
+                            <small class="text-white-50 px-3">CUENTA</small>
+                        </li>
+
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'perfil' %}active{% endif %}" href="{{ url_for('perfil') }}">
+                                <i class="fas fa-user me-2"></i>Mi Perfil
+                            </a>
+                        </li>
+
+                        <li class="nav-item">
+                            <a class="nav-link text-warning" href="{{ url_for('logout') }}">
+                                <i class="fas fa-sign-out-alt me-2"></i>Cerrar Sesión
+                            </a>
+                        </li>
                     </ul>
-
-                    <!-- Información del sistema -->
-                    <div class="mt-5 px-3">
-                        <small class="text-muted">
-                            <i class="fas fa-info-circle me-1"></i>
-                            <strong>Sistema:</strong> Caja UNAPEC<br>
-                            <i class="fas fa-user me-1"></i>
-                            <strong>Rol:</strong> {{ current_user.rol.nombre }}<br>
-                            <i class="fas fa-clock me-1"></i>
-                            <strong>Hora:</strong> <span id="current-time"></span>
-                        </small>
-                    </div>
                 </div>
             </div>
 
-            <!-- Main content -->
-            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">{% block page_title %}{% endblock %}</h1>
-                    <div class="btn-toolbar mb-2 mb-md-0">
-                        <div class="btn-group me-2">
-                            <span class="btn btn-sm btn-outline-secondary">
-                                <i class="fas fa-calendar me-1"></i>
-                                {{ datetime.now().strftime('%d/%m/%Y') }}
+            <!-- Main Content -->
+            <div class="col-md-9 col-lg-10 main-content ms-sm-auto px-md-4">
+                <!-- Navbar Superior -->
+                <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom">
+                    <div class="container-fluid">
+                        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#sidebarMenu">
+                            <span class="navbar-toggler-icon"></span>
+                        </button>
+                        
+                        <div class="navbar-nav ms-auto">
+                            {% if current_user.is_authenticated %}
+                            <span class="navbar-text me-3">
+                                <i class="fas fa-user-circle me-1"></i>
+                                {{ current_user.username }}
                             </span>
+                            {% endif %}
                         </div>
                     </div>
-                </div>
+                </nav>
 
-                {% with messages = get_flashed_messages(with_categories=true) %}
-                    {% if messages %}
-                        {% for category, message in messages %}
-                            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-                                {{ message }}
-                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                            </div>
-                        {% endfor %}
-                    {% endif %}
-                {% endwith %}
+                <!-- Contenido Principal -->
+                <main class="py-4">
+                    <!-- Mensajes Flash -->
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                        {% if messages %}
+                            {% for category, message in messages %}
+                                <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                                    {{ message }}
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endwith %}
 
-                {% block content %}{% endblock %}
-            </main>
+                    <!-- Contenido de la Página -->
+                    {% block content %}{% endblock %}
+                </main>
+            </div>
         </div>
     </div>
-    {% else %}
-        {% block login_content %}{% endblock %}
-    {% endif %}
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Scripts Globales -->
     <script>
-        // Confirmación para eliminar
-        function confirmDelete(message = '¿Está seguro que desea eliminar este registro?') {
-            return confirm(message);
+        // Confirmar eliminaciones
+        function confirmDelete() {
+            return confirm('¿Está seguro de que desea eliminar este registro? Esta acción no se puede deshacer.');
         }
 
-        // Hora actual en tiempo real
-        function updateTime() {
-            const now = new Date();
-            const timeString = now.toLocaleTimeString('es-DO', { 
-                hour: '2-digit', 
-                minute: '2-digit',
-                second: '2-digit'
-            });
-            document.getElementById('current-time').textContent = timeString;
-        }
-
-        // Actualizar hora cada segundo
-        if (document.getElementById('current-time')) {
-            updateTime();
-            setInterval(updateTime, 1000);
-        }
+        // Auto-ocultar alerts después de 5 segundos
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(function() {
+                var alerts = document.querySelectorAll('.alert');
+                alerts.forEach(function(alert) {
+                    var bsAlert = new bootstrap.Alert(alert);
+                    bsAlert.close();
+                });
+            }, 5000);
+        });
 
         // Activar tooltips
-        document.addEventListener('DOMContentLoaded', function() {
-            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-            var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-                return new bootstrap.Tooltip(tooltipTriggerEl);
-            });
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
         });
     </script>
+
+    <!-- Scripts específicos de la página -->
+    {% block scripts %}{% endblock %}
 </body>
 </html>

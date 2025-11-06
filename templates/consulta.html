@@ -8,61 +8,36 @@
         <div class="card mb-4">
             <div class="card-header">
                 <h5 class="card-title mb-0">
-                    <i class="fas fa-search me-2"></i>Filtros de Búsqueda
+                    <i class="fas fa-search me-2"></i>Buscar Movimientos por Cliente
                 </h5>
             </div>
             <div class="card-body">
                 <form method="GET" action="{{ url_for('consulta') }}">
                     <div class="row">
-                        <div class="col-md-3 mb-3">
-                            <label class="form-label">Cliente</label>
-                            <select class="form-select" name="cliente_id">
-                                <option value="">Todos los clientes</option>
-                                {% for cliente in clientes %}
-                                <option value="{{ cliente.id }}" {% if request.args.get('cliente_id')|int == cliente.id %}selected{% endif %}>
-                                    {{ cliente.nombre }}
-                                </option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="col-md-3 mb-3">
-                            <label class="form-label">Servicio</label>
-                            <select class="form-select" name="servicio_id">
-                                <option value="">Todos los servicios</option>
-                                {% for servicio in servicios %}
-                                <option value="{{ servicio.id }}" {% if request.args.get('servicio_id')|int == servicio.id %}selected{% endif %}>
-                                    {{ servicio.descripcion }}
-                                </option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="col-md-3 mb-3">
-                            <label class="form-label">Tipo de Documento</label>
-                            <select class="form-select" name="tipo_documento_id">
-                                <option value="">Todos los tipos</option>
-                                {% for tipo in tipos_documentos %}
-                                <option value="{{ tipo.id }}" {% if request.args.get('tipo_documento_id')|int == tipo.id %}selected{% endif %}>
-                                    {{ tipo.descripcion }}
-                                </option>
-                                {% endfor %}
-                            </select>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Buscar por Nombre del Cliente</label>
+                            <input type="text" class="form-control" name="nombre_cliente" 
+                                   value="{{ request.args.get('nombre_cliente', '') }}" 
+                                   placeholder="Ingrese el nombre del cliente...">
                         </div>
                         <div class="col-md-3 mb-3">
                             <label class="form-label">Fecha Desde</label>
-                            <input type="date" class="form-control" name="fecha_desde" value="{{ request.args.get('fecha_desde', '') }}">
+                            <input type="date" class="form-control" name="fecha_desde" 
+                                   value="{{ request.args.get('fecha_desde', '') }}">
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Fecha Hasta</label>
+                            <input type="date" class="form-control" name="fecha_hasta" 
+                                   value="{{ request.args.get('fecha_hasta', '') }}">
                         </div>
                     </div>
                     <div class="row">
-                        <div class="col-md-3 mb-3">
-                            <label class="form-label">Fecha Hasta</label>
-                            <input type="date" class="form-control" name="fecha_hasta" value="{{ request.args.get('fecha_hasta', '') }}">
-                        </div>
-                        <div class="col-md-9 mb-3 d-flex align-items-end">
-                            <button type="submit" class="btn btn-primary me-2">
+                        <div class="col-md-12 mb-3">
+                            <button type="submit" class="btn btn-primary">
                                 <i class="fas fa-search me-2"></i>Buscar
                             </button>
                             <a href="{{ url_for('consulta') }}" class="btn btn-secondary">
-                                <i class="fas fa-undo me-2"></i>Limpiar
+                                <i class="fas fa-refresh me-2"></i>Limpiar
                             </a>
                         </div>
                     </div>
@@ -83,13 +58,13 @@
                     <table class="table table-striped">
                         <thead>
                             <tr>
-                                <th>No. Movimiento</th>
-                                <th>Fecha Movimiento</th>
-                                <th>Empleado</th>
+                                <th>Fecha</th>
                                 <th>Cliente</th>
                                 <th>Servicio</th>
+                                <th>Empleado</th>
                                 <th>Tipo Documento</th>
                                 <th>Forma Pago</th>
+                                <th>Modalidad</th>
                                 <th>Monto</th>
                                 <th>Estado</th>
                             </tr>
@@ -97,16 +72,22 @@
                         <tbody>
                             {% for movimiento in movimientos %}
                             <tr>
-                                <td>{{ movimiento.id }}</td>
-                                <td>{{ movimiento.fecha_movimiento.strftime('%d/%m/%Y %H:%M') }}</td>
-                                <td>{{ movimiento.empleado.nombre }}</td>
-                                <td>{{ movimiento.cliente.nombre }}</td>
+                                <td>{{ movimiento.fecha_movimiento.strftime('%Y-%m-%d %H:%M') }}</td>
+                                <td>
+                                    <strong>{{ movimiento.cliente.nombre }}</strong>
+                                    <br>
+                                    <small class="text-muted">{{ movimiento.cliente.tipo_documento }}: {{ movimiento.cliente.numero_documento }}</small>
+                                </td>
                                 <td>{{ movimiento.servicio.descripcion }}</td>
+                                <td>{{ movimiento.empleado.nombre }}</td>
                                 <td>{{ movimiento.tipo_documento.descripcion }}</td>
                                 <td>{{ movimiento.forma_pago.descripcion }}</td>
-                                <td><strong>RD$ {{ "%.2f"|format(movimiento.monto) }}</strong></td>
+                                <td>{{ movimiento.modalidad_pago.descripcion }}</td>
                                 <td>
-                                    <span class="badge bg-{% if movimiento.estado == 'Activo' %}success{% else %}danger{% endif %}">
+                                    <strong>${{ "%.2f"|format(movimiento.monto) }}</strong>
+                                </td>
+                                <td>
+                                    <span class="badge bg-{% if movimiento.estado == 'Activo' %}success{% else %}warning{% endif %}">
                                         {{ movimiento.estado }}
                                     </span>
                                 </td>
@@ -115,39 +96,43 @@
                         </tbody>
                     </table>
                 </div>
-                
-                <!-- Resumen de la consulta -->
+
+                <!-- Resumen de resultados -->
                 <div class="row mt-4">
-                    <div class="col-md-4">
-                        <div class="card bg-light">
-                            <div class="card-body text-center">
-                                <h5 class="card-title">Total Movimientos</h5>
-                                <h3 class="text-primary">{{ movimientos|length }}</h3>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="card bg-light">
-                            <div class="card-body text-center">
-                                <h5 class="card-title">Monto Total</h5>
-                                <h3 class="text-success">RD$ {{ "%.2f"|format(movimientos|sum(attribute='monto')) }}</h3>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="card bg-light">
-                            <div class="card-body text-center">
-                                <h5 class="card-title">Promedio por Movimiento</h5>
-                                <h3 class="text-info">RD$ {{ "%.2f"|format((movimientos|sum(attribute='monto') / movimientos|length) if movimientos|length > 0 else 0) }}</h3>
+                    <div class="col-md-12">
+                        <div class="alert alert-info">
+                            <h6 class="alert-heading">Resumen de la Consulta</h6>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <strong>Total de Movimientos:</strong> {{ movimientos|length }}
+                                </div>
+                                <div class="col-md-4">
+                                    <strong>Monto Total:</strong> ${{ "%.2f"|format(movimientos|sum(attribute='monto')) }}
+                                </div>
+                                <div class="col-md-4">
+                                    <strong>Promedio por Movimiento:</strong> ${{ "%.2f"|format((movimientos|sum(attribute='monto')) / movimientos|length if movimientos else 0) }}
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-        {% elif request.args %}
-        <div class="alert alert-info">
-            <i class="fas fa-info-circle me-2"></i>No se encontraron movimientos con los criterios especificados.
+        {% elif request.args.get('nombre_cliente') %}
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">No se encontraron movimientos</h5>
+                <p class="text-muted">No hay movimientos que coincidan con el criterio de búsqueda.</p>
+            </div>
+        </div>
+        {% else %}
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">Realice una búsqueda</h5>
+                <p class="text-muted">Ingrese el nombre de un cliente para ver sus movimientos.</p>
+            </div>
         </div>
         {% endif %}
     </div>
