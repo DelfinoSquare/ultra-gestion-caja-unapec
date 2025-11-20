@@ -537,7 +537,12 @@ def agregar_usuario():
         rol_id = request.form['rol_id']
         estado = request.form['estado']
         
-        # Validaciones
+        # Validaciones básicas
+        if not username or not password or not email:
+            flash('Todos los campos obligatorios deben ser completados', 'danger')
+            return redirect(url_for('admin_usuarios'))
+        
+        # Verificar si el usuario ya existe
         if Usuario.query.filter_by(username=username).first():
             flash('Ya existe un usuario con ese nombre', 'danger')
             return redirect(url_for('admin_usuarios'))
@@ -546,9 +551,13 @@ def agregar_usuario():
             flash('Ya existe un usuario con ese email', 'danger')
             return redirect(url_for('admin_usuarios'))
         
+        # Generar hash de la contraseña
+        password_hash = generate_password_hash(password)
+        
+        # Crear nuevo usuario
         nuevo_usuario = Usuario(
             username=username,
-            password=generate_password_hash(password),
+            password=password_hash,
             email=email,
             empleado_id=empleado_id if empleado_id else None,
             rol_id=rol_id,
@@ -557,7 +566,10 @@ def agregar_usuario():
         
         db.session.add(nuevo_usuario)
         db.session.commit()
-        flash('Usuario creado correctamente', 'success')
+        
+        # Obtener el rol asignado para mostrar en el mensaje
+        rol_asignado = Rol.query.get(rol_id)
+        flash(f'Usuario {username} creado correctamente con rol {rol_asignado.nombre}', 'success')
         
     except Exception as e:
         db.session.rollback()
