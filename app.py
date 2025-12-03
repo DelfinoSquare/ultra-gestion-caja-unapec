@@ -1,9 +1,15 @@
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, session, Response
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 from functools import wraps
+
+import io
+import matplotlib
+matplotlib.use('Agg')  # Para usar matplotlib sin interfaz gráfica
+import matplotlib.pyplot as plt
+from fpdf import FPDF
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'unapec-caja-secret-key'
@@ -26,6 +32,34 @@ ROLES = {
     'CONSULTA': 'Consulta',
     'GERENTE': 'Gerente'
 }
+
+# Clase PDF personalizada
+class PDFReport(FPDF):
+    def header(self):
+        # Logo o título
+        self.set_font('Arial', 'B', 16)
+        self.cell(0, 10, 'SISTEMA DE CAJA UNAPEC', 0, 1, 'C')
+        self.set_font('Arial', 'B', 14)
+        self.cell(0, 10, 'REPORTE DE MOVIMIENTOS', 0, 1, 'C')
+        self.ln(5)
+    
+    def footer(self):
+        # Pie de página
+        self.set_y(-15)
+        self.set_font('Arial', 'I', 8)
+        self.cell(0, 10, f'Página {self.page_no()} - Generado el: {datetime.now().strftime("%d/%m/%Y %H:%M")}', 0, 0, 'C')
+    
+    def chapter_title(self, title):
+        # Título de capítulo
+        self.set_font('Arial', 'B', 12)
+        self.cell(0, 10, title, 0, 1, 'L')
+        self.ln(2)
+    
+    def chapter_body(self, body):
+        # Cuerpo del texto
+        self.set_font('Arial', '', 10)
+        self.multi_cell(0, 8, body)
+        self.ln()
 
 # Modelos de Seguridad
 class Rol(db.Model):
@@ -116,6 +150,7 @@ class MovimientoCaja(db.Model):
     modalidad_pago_id = db.Column(db.Integer, db.ForeignKey('modalidad_pago.id'), nullable=False)
     fecha_movimiento = db.Column(db.DateTime, nullable=False, default=datetime.now)
     monto = db.Column(db.Float, nullable=False)
+    descripcion = db.Column(db.Text)
     estado = db.Column(db.String(20), default='Activo')
 
 @login_manager.user_loader
@@ -428,7 +463,7 @@ def obtener_modulos_permitidos(rol):
 def obtener_acciones_permitidas(rol):
     acciones = {
         'ADMIN': ['Ver todo', 'Crear', 'Editar', 'Eliminar', 'Generar reportes', 'Administrar usuarios'],
-        'GERENTE': ['Ver todo', 'Crear', 'Editar', 'Generar reportes'],
+        'GERENTE': ['Ver todo', 'Crear', 'Editar', 'Generar reportes',],
         'CAJERO': ['Ver movimientos', 'Crear movimientos'],
         'CONSULTA': ['Ver consultas', 'Generar reportes']
     }
@@ -1077,7 +1112,6 @@ def movimientos():
     empleado_id = request.args.get('empleado_id', type=int)
     cliente_id = request.args.get('cliente_id', type=int)
     servicio_id = request.args.get('servicio_id', type=int)
-    tipo_documento_id = request.args.get('tipo_documento_id', type=int)
     fecha_desde = request.args.get('fecha_desde')
     fecha_hasta = request.args.get('fecha_hasta')
     
@@ -1091,17 +1125,16 @@ def movimientos():
         query = query.filter_by(cliente_id=cliente_id)
     if servicio_id:
         query = query.filter_by(servicio_id=servicio_id)
-    if tipo_documento_id:
-        query = query.filter_by(tipo_documento_id=tipo_documento_id)
     if fecha_desde:
         query = query.filter(MovimientoCaja.fecha_movimiento >= fecha_desde)
     if fecha_hasta:
-        query = query.filter(MovimientoCaja.fecha_movimiento <= fecha_hasta)
+        fecha_hasta_completa = f"{fecha_hasta} 23:59:59"
+        query = query.filter(MovimientoCaja.fecha_movimiento <= fecha_hasta_completa)
     
     # Obtener movimientos filtrados
     movimientos_list = query.order_by(MovimientoCaja.fecha_movimiento.desc()).all()
     
-    # Obtener datos para los filtros
+    # Obtener datos para los filtros y formulario
     tipos_documentos = TipoDocumento.query.filter_by(estado='Activo').all()
     servicios = Servicio.query.filter_by(estado='Activo').all()
     formas_pago = FormaPago.query.filter_by(estado='Activo').all()
@@ -1122,7 +1155,7 @@ def movimientos():
 @cajero_required
 def agregar_movimiento():
     try:
-        # Recoger datos
+        # Recoger datos del formulario
         empleado_id = int(request.form['empleado_id'])
         cliente_id = int(request.form['cliente_id'])
         servicio_id = int(request.form['servicio_id'])
@@ -1130,31 +1163,19 @@ def agregar_movimiento():
         forma_pago_id = int(request.form['forma_pago_id'])
         modalidad_pago_id = int(request.form['modalidad_pago_id'])
         monto = float(request.form['monto'])
-        estado = request.form['estado']
+        descripcion = request.form.get('descripcion', '')
         
-        # Validar movimiento
-        datos_movimiento = {
-            'empleado_id': empleado_id,
-            'cliente_id': cliente_id,
-            'servicio_id': servicio_id,
-            'tipo_documento_id': tipo_documento_id,
-            'forma_pago_id': forma_pago_id,
-            'modalidad_pago_id': modalidad_pago_id,
-            'monto': monto
-        }
-        
-        es_valido, mensaje = validar_movimiento(datos_movimiento)
-        if not es_valido:
-            flash(mensaje, 'danger')
-            return redirect(url_for('movimientos'))
-        
-        # Verificar que las referencias existan
+        # Validar que las referencias existan
         if not Empleado.query.get(empleado_id):
             flash('El empleado seleccionado no existe', 'danger')
             return redirect(url_for('movimientos'))
         
         if not Cliente.query.get(cliente_id):
             flash('El cliente seleccionado no existe', 'danger')
+            return redirect(url_for('movimientos'))
+            
+        if not Servicio.query.get(servicio_id):
+            flash('El servicio seleccionado no existe', 'danger')
             return redirect(url_for('movimientos'))
         
         # Crear movimiento
@@ -1166,12 +1187,14 @@ def agregar_movimiento():
             forma_pago_id=forma_pago_id,
             modalidad_pago_id=modalidad_pago_id,
             monto=monto,
-            estado=estado,
+            descripcion=descripcion,
+            estado='Activo',
             fecha_movimiento=datetime.now()
         )
         
         db.session.add(nuevo_movimiento)
         db.session.commit()
+        
         flash('Movimiento registrado correctamente', 'success')
         
     except ValueError as e:
@@ -1188,7 +1211,6 @@ def eliminar_movimiento(id):
     success, message = safe_delete(MovimientoCaja, id)
     flash(message, 'success' if success else 'danger')
     return redirect(url_for('movimientos'))
-
 
 # Consultas Simplificadas
 @app.route('/consulta')
@@ -1222,53 +1244,6 @@ def consulta():
                          nombre_cliente=nombre_cliente,
                          fecha_desde=fecha_desde,
                          fecha_hasta=fecha_hasta)
-    
-    # Obtener todos los parámetros de filtro
-    cliente_id = request.args.get('cliente_id', type=int)
-    servicio_id = request.args.get('servicio_id', type=int)
-    tipo_documento_id = request.args.get('tipo_documento_id', type=int)
-    forma_pago_id = request.args.get('forma_pago_id', type=int)
-    empleado_id = request.args.get('empleado_id', type=int)
-    fecha_desde = request.args.get('fecha_desde')
-    fecha_hasta = request.args.get('fecha_hasta')
-    estado = request.args.get('estado')
-    monto_min = request.args.get('monto_min', type=float)
-    monto_max = request.args.get('monto_max', type=float)
-    
-    # Construir query base
-    query = MovimientoCaja.query
-    
-    # Aplicar filtros de manera flexible
-    if cliente_id:
-        query = query.filter_by(cliente_id=cliente_id)
-    if servicio_id:
-        query = query.filter_by(servicio_id=servicio_id)
-    if tipo_documento_id:
-        query = query.filter_by(tipo_documento_id=tipo_documento_id)
-    if forma_pago_id:
-        query = query.filter_by(forma_pago_id=forma_pago_id)
-    if empleado_id:
-        query = query.filter_by(empleado_id=empleado_id)
-    if estado and estado != 'Todos':
-        query = query.filter_by(estado=estado)
-    if fecha_desde:
-        query = query.filter(MovimientoCaja.fecha_movimiento >= fecha_desde)
-    if fecha_hasta:
-        query = query.filter(MovimientoCaja.fecha_movimiento <= fecha_hasta)
-    if monto_min is not None:
-        query = query.filter(MovimientoCaja.monto >= monto_min)
-    if monto_max is not None:
-        query = query.filter(MovimientoCaja.monto <= monto_max)
-        
-    movimientos = query.order_by(MovimientoCaja.fecha_movimiento.desc()).all()
-    
-    return render_template('consulta.html', 
-                         movimientos=movimientos,
-                         clientes=clientes,
-                         servicios=servicios,
-                         tipos_documentos=tipos_documentos,
-                         formas_pago=formas_pago,
-                         empleados=empleados)
 
 # Búsqueda Unificada de Clientes y Empleados
 @app.route('/busqueda')
@@ -1318,52 +1293,295 @@ def busqueda():
                          query=query,
                          tipo=tipo)
 
-
-# Reportes
-@app.route('/reporte')
-@consulta_required
-def reporte():
-    movimientos = []
-    formas_pago = FormaPago.query.all()
-    servicios = Servicio.query.all()
-    modalidades_pago = ModalidadPago.query.all()
-    tipos_documentos = TipoDocumento.query.all()
-    clientes = Cliente.query.all()
+# Función auxiliar para obtener movimientos filtrados
+def obtener_movimientos_filtrados():
+    forma_pago_id = request.args.get('forma_pago_id', type=int) or None
+    servicio_id = request.args.get('servicio_id', type=int) or None
+    modalidad_pago_id = request.args.get('modalidad_pago_id', type=int) or None
+    tipo_documento_id = request.args.get('tipo_documento_id', type=int) or None
+    cliente_id = request.args.get('cliente_id', type=int) or None
+    fecha_desde = request.args.get('fecha_desde', '')
+    fecha_hasta = request.args.get('fecha_hasta', '')
     
-    # Múltiples criterios de filtro
-    forma_pago_id = request.args.get('forma_pago_id', type=int)
-    servicio_id = request.args.get('servicio_id', type=int)
-    modalidad_pago_id = request.args.get('modalidad_pago_id', type=int)
-    tipo_documento_id = request.args.get('tipo_documento_id', type=int)
-    cliente_id = request.args.get('cliente_id', type=int)
-    fecha_desde = request.args.get('fecha_desde')
-    fecha_hasta = request.args.get('fecha_hasta')
-    agrupar_por = request.args.get('agrupar_por', 'servicio')
-    
-    query = MovimientoCaja.query
+    query = MovimientoCaja.query.join(Cliente).join(Servicio).join(FormaPago)
     
     if forma_pago_id:
-        query = query.filter_by(forma_pago_id=forma_pago_id)
+        query = query.filter(MovimientoCaja.forma_pago_id == forma_pago_id)
     if servicio_id:
-        query = query.filter_by(servicio_id=servicio_id)
+        query = query.filter(MovimientoCaja.servicio_id == servicio_id)
     if modalidad_pago_id:
-        query = query.filter_by(modalidad_pago_id=modalidad_pago_id)
+        query = query.filter(MovimientoCaja.modalidad_pago_id == modalidad_pago_id)
     if tipo_documento_id:
-        query = query.filter_by(tipo_documento_id=tipo_documento_id)
+        query = query.filter(MovimientoCaja.tipo_documento_id == tipo_documento_id)
     if cliente_id:
-        query = query.filter_by(cliente_id=cliente_id)
+        query = query.filter(MovimientoCaja.cliente_id == cliente_id)
     if fecha_desde:
         query = query.filter(MovimientoCaja.fecha_movimiento >= fecha_desde)
     if fecha_hasta:
-        query = query.filter(MovimientoCaja.fecha_movimiento <= fecha_hasta)
+        fecha_hasta_completa = f"{fecha_hasta} 23:59:59"
+        query = query.filter(MovimientoCaja.fecha_movimiento <= fecha_hasta_completa)
         
+    return query.order_by(MovimientoCaja.fecha_movimiento.desc()).all()
+
+# Exportar a PDF
+@app.route('/exportar-pdf')
+@consulta_required
+def exportar_pdf():
+    # Obtener movimientos filtrados
+    movimientos = obtener_movimientos_filtrados()
+    
+    # Crear PDF
+    pdf = PDFReport()
+    pdf.add_page()
+    
+    # Información del reporte
+    fecha_desde = request.args.get('fecha_desde', 'Inicio')
+    fecha_hasta = request.args.get('fecha_hasta', 'Hoy')
+    
+    pdf.set_font('Arial', '', 10)
+    pdf.cell(0, 8, f'Período: {fecha_desde} hasta {fecha_hasta}', 0, 1)
+    pdf.cell(0, 8, f'Total de movimientos: {len(movimientos)}', 0, 1)
+    pdf.cell(0, 8, f'Ingreso total: ${sum(m.monto for m in movimientos):.2f}', 0, 1)
+    pdf.ln(10)
+    
+    if movimientos:
+        # Resumen estadístico
+        pdf.chapter_title('RESUMEN ESTADÍSTICO')
+        
+        total = sum(m.monto for m in movimientos)
+        promedio = total / len(movimientos) if movimientos else 0
+        max_monto = max(m.monto for m in movimientos) if movimientos else 0
+        
+        pdf.set_font('Arial', '', 10)
+        pdf.cell(0, 8, f'- Total de movimientos: {len(movimientos)}', 0, 1)
+        pdf.cell(0, 8, f'- Ingreso total: ${total:.2f}', 0, 1)
+        pdf.cell(0, 8, f'- Promedio por movimiento: ${promedio:.2f}', 0, 1)
+        pdf.cell(0, 8, f'- Movimiento más alto: ${max_monto:.2f}', 0, 1)
+        pdf.ln(10)
+        
+        # Tabla de movimientos
+        pdf.chapter_title('DETALLE DE MOVIMIENTOS')
+        
+        # Encabezados de la tabla
+        pdf.set_fill_color(200, 200, 200)
+        pdf.set_font('Arial', 'B', 10)
+        pdf.cell(25, 10, 'Fecha', 1, 0, 'C', True)
+        pdf.cell(50, 10, 'Cliente', 1, 0, 'C', True)
+        pdf.cell(45, 10, 'Servicio', 1, 0, 'C', True)
+        pdf.cell(40, 10, 'Forma Pago', 1, 0, 'C', True)
+        pdf.cell(30, 10, 'Monto', 1, 1, 'C', True)
+        
+        # Datos de la tabla
+        pdf.set_font('Arial', '', 9)
+        fill = False
+        for movimiento in movimientos:
+            # Alternar colores para mejor legibilidad
+            if fill:
+                pdf.set_fill_color(240, 240, 240)
+            else:
+                pdf.set_fill_color(255, 255, 255)
+            
+            # Truncar nombres largos
+            cliente_nombre = movimiento.cliente.nombre
+            if len(cliente_nombre) > 30:
+                cliente_nombre = cliente_nombre[:27] + "..."
+            
+            servicio_nombre = movimiento.servicio.descripcion
+            if len(servicio_nombre) > 25:
+                servicio_nombre = servicio_nombre[:22] + "..."
+            
+            forma_pago = movimiento.forma_pago.descripcion
+            if len(forma_pago) > 20:
+                forma_pago = forma_pago[:17] + "..."
+            
+            pdf.cell(25, 8, movimiento.fecha_movimiento.strftime('%d/%m/%Y'), 1, 0, 'C', fill)
+            pdf.cell(50, 8, cliente_nombre, 1, 0, 'L', fill)
+            pdf.cell(45, 8, servicio_nombre, 1, 0, 'L', fill)
+            pdf.cell(40, 8, forma_pago, 1, 0, 'L', fill)
+            pdf.cell(30, 8, f"${movimiento.monto:.2f}", 1, 1, 'R', fill)
+            fill = not fill
+            
+            # Verificar si necesita nueva página
+            if pdf.get_y() > 260:
+                pdf.add_page()
+                # Volver a poner encabezados en nueva página
+                pdf.set_fill_color(200, 200, 200)
+                pdf.set_font('Arial', 'B', 10)
+                pdf.cell(25, 10, 'Fecha', 1, 0, 'C', True)
+                pdf.cell(50, 10, 'Cliente', 1, 0, 'C', True)
+                pdf.cell(45, 10, 'Servicio', 1, 0, 'C', True)
+                pdf.cell(40, 10, 'Forma Pago', 1, 0, 'C', True)
+                pdf.cell(30, 10, 'Monto', 1, 1, 'C', True)
+                pdf.set_font('Arial', '', 9)
+        
+        pdf.ln(10)
+        
+    else:
+        pdf.chapter_title('INFORMACIÓN')
+        pdf.set_font('Arial', '', 10)
+        pdf.multi_cell(0, 8, 'No hay movimientos que coincidan con los criterios seleccionados.')
+    
+    # Guardar PDF en buffer
+   # CORRECCIÓN SIMPLIFICADA - solo cambia estas líneas al final de la función:
+
+    # Guardar PDF en buffer - VERSIÓN CORREGIDA
+    pdf_buffer = io.BytesIO()
+    pdf_output = pdf.output(dest='S')  # 'S' para obtener como string
+    
+    # Verificar el tipo y manejarlo apropiadamente
+    if isinstance(pdf_output, str):
+        pdf_buffer.write(pdf_output.encode('latin1'))
+    else:
+        pdf_buffer.write(pdf_output)
+    
+    pdf_buffer.seek(0)
+    
+    return Response(
+        pdf_buffer.getvalue(),
+        mimetype='application/pdf',
+        headers={
+            'Content-Disposition': f'attachment; filename=reporte_movimientos_{datetime.now().strftime("%Y%m%d_%H%M")}.pdf'
+        }
+    )
+
+# Generar gráfico de servicios
+@app.route('/grafico/servicios')
+@consulta_required
+def grafico_servicios():
+    # Obtener los mismos filtros que el reporte
+    movimientos = obtener_movimientos_filtrados()
+    
+    # Agrupar por servicio
+    servicios_data = {}
+    for movimiento in movimientos:
+        servicio_nombre = movimiento.servicio.descripcion
+        if servicio_nombre not in servicios_data:
+            servicios_data[servicio_nombre] = 0
+        servicios_data[servicio_nombre] += movimiento.monto
+    
+    # Crear gráfico
+    plt.figure(figsize=(8, 6))
+    if servicios_data:
+        # Usar colores pastel
+        colors = ['#FF9999', '#66B2FF', '#99FF99', '#FFD700', '#FFB6C1', '#C2C2F0']
+        plt.pie(servicios_data.values(), 
+                labels=servicios_data.keys(), 
+                autopct='%1.1f%%', 
+                startangle=90,
+                colors=colors[:len(servicios_data)])
+        plt.title('Distribución de Ingresos por Servicio', fontsize=14, fontweight='bold')
+    else:
+        plt.text(0.5, 0.5, 'No hay datos disponibles', 
+                ha='center', va='center', transform=plt.gca().transAxes,
+                fontsize=12, style='italic')
+        plt.title('Distribución de Ingresos por Servicio', fontsize=14, fontweight='bold')
+    
+    # Guardar en buffer
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png', dpi=100, bbox_inches='tight', 
+                facecolor='white', edgecolor='none')
+    plt.close()
+    buf.seek(0)
+    
+    return Response(buf.getvalue(), mimetype='image/png')
+
+# Generar gráfico de formas de pago
+@app.route('/grafico/formas-pago')
+@consulta_required
+def grafico_formas_pago():
+    # Obtener los mismos filtros que el reporte
+    movimientos = obtener_movimientos_filtrados()
+    
+    # Agrupar por forma de pago
+    formas_pago_data = {}
+    for movimiento in movimientos:
+        forma_pago_nombre = movimiento.forma_pago.descripcion
+        if forma_pago_nombre not in formas_pago_data:
+            formas_pago_data[forma_pago_nombre] = 0
+        formas_pago_data[forma_pago_nombre] += movimiento.monto
+    
+    # Crear gráfico de barras
+    plt.figure(figsize=(10, 6))
+    if formas_pago_data:
+        colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD']
+        bars = plt.bar(formas_pago_data.keys(), formas_pago_data.values(), 
+                      color=colors[:len(formas_pago_data)])
+        plt.title('Distribución de Ingresos por Forma de Pago', fontsize=14, fontweight='bold')
+        plt.xticks(rotation=45, ha='right')
+        plt.ylabel('Monto ($)', fontweight='bold')
+        
+        # Agregar valores en las barras
+        for bar in bars:
+            height = bar.get_height()
+            plt.text(bar.get_x() + bar.get_width()/2., height,
+                    f'${height:,.2f}',
+                    ha='center', va='bottom', fontweight='bold')
+    else:
+        plt.text(0.5, 0.5, 'No hay datos disponibles', 
+                ha='center', va='center', transform=plt.gca().transAxes,
+                fontsize=12, style='italic')
+        plt.title('Distribución de Ingresos por Forma de Pago', fontsize=14, fontweight='bold')
+    
+    plt.tight_layout()
+    
+    # Guardar en buffer
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png', dpi=100, bbox_inches='tight',
+                facecolor='white', edgecolor='none')
+    plt.close()
+    buf.seek(0)
+    
+    return Response(buf.getvalue(), mimetype='image/png')
+
+# Reportes Corregidos
+@app.route('/reporte')
+@consulta_required
+def reporte():
+    # Obtener parámetros de filtro con valores por defecto
+    forma_pago_id = request.args.get('forma_pago_id', type=int) or None
+    servicio_id = request.args.get('servicio_id', type=int) or None
+    modalidad_pago_id = request.args.get('modalidad_pago_id', type=int) or None
+    tipo_documento_id = request.args.get('tipo_documento_id', type=int) or None
+    cliente_id = request.args.get('cliente_id', type=int) or None
+    fecha_desde = request.args.get('fecha_desde', '')
+    fecha_hasta = request.args.get('fecha_hasta', '')
+    
+    # Construir query base con joins para optimizar
+    query = MovimientoCaja.query.join(Cliente).join(Servicio).join(FormaPago)
+    
+    # Aplicar filtros solo si tienen valor
+    if forma_pago_id:
+        query = query.filter(MovimientoCaja.forma_pago_id == forma_pago_id)
+    if servicio_id:
+        query = query.filter(MovimientoCaja.servicio_id == servicio_id)
+    if modalidad_pago_id:
+        query = query.filter(MovimientoCaja.modalidad_pago_id == modalidad_pago_id)
+    if tipo_documento_id:
+        query = query.filter(MovimientoCaja.tipo_documento_id == tipo_documento_id)
+    if cliente_id:
+        query = query.filter(MovimientoCaja.cliente_id == cliente_id)
+    if fecha_desde:
+        query = query.filter(MovimientoCaja.fecha_movimiento >= fecha_desde)
+    if fecha_hasta:
+        # Agregar 23:59:59 a la fecha hasta para incluir todo el día
+        fecha_hasta_completa = f"{fecha_hasta} 23:59:59"
+        query = query.filter(MovimientoCaja.fecha_movimiento <= fecha_hasta_completa)
+    
+    # Ejecutar query
     movimientos = query.order_by(MovimientoCaja.fecha_movimiento.desc()).all()
     
     # Cálculos estadísticos
-    total = sum(m.monto for m in movimientos)
+    total = sum(m.monto for m in movimientos) if movimientos else 0
     promedio = total / len(movimientos) if movimientos else 0
     movimiento_max = max(movimientos, key=lambda x: x.monto) if movimientos else None
     movimiento_min = min(movimientos, key=lambda x: x.monto) if movimientos else None
+    
+    # Obtener datos para los filtros
+    formas_pago = FormaPago.query.filter_by(estado='Activo').all()
+    servicios = Servicio.query.filter_by(estado='Activo').all()
+    modalidades_pago = ModalidadPago.query.filter_by(estado='Activo').all()
+    tipos_documentos = TipoDocumento.query.filter_by(estado='Activo').all()
+    clientes = Cliente.query.filter_by(estado='Activo').all()
     
     return render_template('reporte.html', 
                          movimientos=movimientos,
@@ -1376,7 +1594,14 @@ def reporte():
                          promedio=promedio,
                          movimiento_max=movimiento_max,
                          movimiento_min=movimiento_min,
-                         agrupar_por=agrupar_por)
+                         # Pasar los valores actuales de filtros para mantenerlos en el form
+                         forma_pago_id=forma_pago_id,
+                         servicio_id=servicio_id,
+                         modalidad_pago_id=modalidad_pago_id,
+                         tipo_documento_id=tipo_documento_id,
+                         cliente_id=cliente_id,
+                         fecha_desde=fecha_desde,
+                         fecha_hasta=fecha_hasta)
 
 # Context processor para hacer datetime disponible en todos los templates
 @app.context_processor

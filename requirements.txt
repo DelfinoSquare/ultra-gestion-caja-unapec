@@ -1,6 +1,7 @@
 Flask==2.3.3
 Flask-SQLAlchemy==3.0.5
-SQLAlchemy==2.0.19
-Werkzeug==2.3.6
 Flask-Login==0.6.3
 Werkzeug==2.3.6
+SQLAlchemy==2.0.19
+fpdf2==2.7.5
+matplotlib==3.5.3

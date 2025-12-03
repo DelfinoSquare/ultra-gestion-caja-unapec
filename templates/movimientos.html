@@ -1,83 +1,90 @@
 {% extends "base.html" %}
 
-{% block page_title %}Registro de Movimientos en Caja{% endblock %}
+{% block page_title %}Movimientos de Caja{% endblock %}
 
 {% block content %}
 <div class="row">
     <div class="col-12">
-        <!-- Filtros para el reporte -->
         <div class="card mb-4">
             <div class="card-header">
                 <h5 class="card-title mb-0">
-                    <i class="fas fa-filter me-2"></i>Filtros del Reporte
+                    <i class="fas fa-plus-circle me-2"></i>Registrar Nuevo Movimiento
                 </h5>
             </div>
             <div class="card-body">
-                <form method="GET" action="{{ url_for('movimientos') }}">
+                <form method="POST" action="{{ url_for('agregar_movimiento') }}">
                     <div class="row">
-                        <div class="col-md-3 mb-3">
-                            <label class="form-label">Empleado</label>
-                            <select class="form-select" name="empleado_id">
-                                <option value="">Todos los empleados</option>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Empleado *</label>
+                            <select class="form-select" name="empleado_id" required>
+                                <option value="">Seleccionar empleado...</option>
                                 {% for empleado in empleados %}
-                                <option value="{{ empleado.id }}" {% if request.args.get('empleado_id')|int == empleado.id %}selected{% endif %}>
-                                    {{ empleado.nombre }}
-                                </option>
+                                <option value="{{ empleado.id }}">{{ empleado.nombre }}</option>
                                 {% endfor %}
                             </select>
                         </div>
-                        <div class="col-md-3 mb-3">
-                            <label class="form-label">Cliente</label>
-                            <select class="form-select" name="cliente_id">
-                                <option value="">Todos los clientes</option>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Cliente *</label>
+                            <select class="form-select" name="cliente_id" required>
+                                <option value="">Seleccionar cliente...</option>
                                 {% for cliente in clientes %}
-                                <option value="{{ cliente.id }}" {% if request.args.get('cliente_id')|int == cliente.id %}selected{% endif %}>
-                                    {{ cliente.nombre }}
-                                </option>
+                                <option value="{{ cliente.id }}">{{ cliente.nombre }}</option>
                                 {% endfor %}
                             </select>
                         </div>
-                        <div class="col-md-3 mb-3">
-                            <label class="form-label">Servicio</label>
-                            <select class="form-select" name="servicio_id">
-                                <option value="">Todos los servicios</option>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Servicio *</label>
+                            <select class="form-select" name="servicio_id" required>
+                                <option value="">Seleccionar servicio...</option>
                                 {% for servicio in servicios %}
-                                <option value="{{ servicio.id }}" {% if request.args.get('servicio_id')|int == servicio.id %}selected{% endif %}>
-                                    {{ servicio.descripcion }}
-                                </option>
+                                <option value="{{ servicio.id }}">{{ servicio.descripcion }}</option>
                                 {% endfor %}
                             </select>
-                        </div>
-                        <div class="col-md-3 mb-3">
-                            <label class="form-label">Fecha Desde</label>
-                            <input type="date" class="form-control" name="fecha_desde" value="{{ request.args.get('fecha_desde', '') }}">
                         </div>
                     </div>
                     <div class="row">
                         <div class="col-md-3 mb-3">
-                            <label class="form-label">Fecha Hasta</label>
-                            <input type="date" class="form-control" name="fecha_hasta" value="{{ request.args.get('fecha_hasta', '') }}">
-                        </div>
-                        <div class="col-md-3 mb-3">
-                            <label class="form-label">Tipo de Documento</label>
-                            <select class="form-select" name="tipo_documento_id">
-                                <option value="">Todos los tipos</option>
+                            <label class="form-label">Tipo de Documento *</label>
+                            <select class="form-select" name="tipo_documento_id" required>
+                                <option value="">Seleccionar tipo...</option>
                                 {% for tipo in tipos_documentos %}
-                                <option value="{{ tipo.id }}" {% if request.args.get('tipo_documento_id')|int == tipo.id %}selected{% endif %}>
-                                    {{ tipo.descripcion }}
-                                </option>
+                                <option value="{{ tipo.id }}">{{ tipo.descripcion }}</option>
                                 {% endfor %}
                             </select>
                         </div>
-                        <div class="col-md-6 mb-3 d-flex align-items-end">
-                            <button type="submit" class="btn btn-primary me-2">
-                                <i class="fas fa-search me-2"></i>Filtrar
-                            </button>
-                            <a href="{{ url_for('movimientos') }}" class="btn btn-secondary me-2">
-                                <i class="fas fa-undo me-2"></i>Limpiar
-                            </a>
-                            <button type="button" class="btn btn-success" onclick="window.print()">
-                                <i class="fas fa-print me-2"></i>Imprimir
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Forma de Pago *</label>
+                            <select class="form-select" name="forma_pago_id" required>
+                                <option value="">Seleccionar forma...</option>
+                                {% for forma in formas_pago %}
+                                <option value="{{ forma.id }}">{{ forma.descripcion }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Modalidad de Pago *</label>
+                            <select class="form-select" name="modalidad_pago_id" required>
+                                <option value="">Seleccionar modalidad...</option>
+                                {% for modalidad in modalidades_pago %}
+                                <option value="{{ modalidad.id }}">{{ modalidad.descripcion }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Monto *</label>
+                            <input type="number" step="0.01" min="0.01" class="form-control" name="monto" required placeholder="0.00">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <label class="form-label">Descripción (Opcional)</label>
+                            <textarea class="form-control" name="descripcion" rows="2" placeholder="Descripción del movimiento..."></textarea>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-12 text-center">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-2"></i>Registrar Movimiento
                             </button>
                         </div>
                     </div>
@@ -85,69 +92,78 @@
             </div>
         </div>
 
-        <!-- Resumen de movimientos -->
-        <div class="row mb-4">
-            <div class="col-md-3">
-                <div class="card bg-primary text-white">
-                    <div class="card-body text-center">
-                        <h4>{{ movimientos|length }}</h4>
-                        <p class="mb-0">Total Movimientos</p>
-                    </div>
-                </div>
+        <!-- Filtros -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-filter me-2"></i>Filtrar Movimientos
+                </h5>
             </div>
-            <div class="col-md-3">
-                <div class="card bg-success text-white">
-                    <div class="card-body text-center">
-                        <h4>
-                            {% set total_monto = 0 %}
-                            {% for movimiento in movimientos %}
-                                {% set total_monto = total_monto + movimiento.monto %}
-                            {% endfor %}
-                            RD$ {{ "%.2f"|format(total_monto) }}
-                        </h4>
-                        <p class="mb-0">Monto Total</p>
+            <div class="card-body">
+                <form method="GET" action="{{ url_for('movimientos') }}">
+                    <div class="row">
+                        <div class="col-md-2 mb-3">
+                            <label class="form-label">Empleado</label>
+                            <select class="form-select" name="empleado_id">
+                                <option value="">Todos</option>
+                                {% for empleado in empleados %}
+                                <option value="{{ empleado.id }}" 
+                                    {% if request.args.get('empleado_id')|int == empleado.id %}selected{% endif %}>
+                                    {{ empleado.nombre }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <label class="form-label">Cliente</label>
+                            <select class="form-select" name="cliente_id">
+                                <option value="">Todos</option>
+                                {% for cliente in clientes %}
+                                <option value="{{ cliente.id }}"
+                                    {% if request.args.get('cliente_id')|int == cliente.id %}selected{% endif %}>
+                                    {{ cliente.nombre }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <label class="form-label">Servicio</label>
+                            <select class="form-select" name="servicio_id">
+                                <option value="">Todos</option>
+                                {% for servicio in servicios %}
+                                <option value="{{ servicio.id }}"
+                                    {% if request.args.get('servicio_id')|int == servicio.id %}selected{% endif %}>
+                                    {{ servicio.descripcion }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <label class="form-label">Fecha Desde</label>
+                            <input type="date" class="form-control" name="fecha_desde" 
+                                   value="{{ request.args.get('fecha_desde', '') }}">
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <label class="form-label">Fecha Hasta</label>
+                            <input type="date" class="form-control" name="fecha_hasta" 
+                                   value="{{ request.args.get('fecha_hasta', '') }}">
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <label class="form-label">&nbsp;</label>
+                            <button type="submit" class="btn btn-outline-primary w-100">
+                                <i class="fas fa-search me-2"></i>Filtrar
+                            </button>
+                        </div>
                     </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card bg-info text-white">
-                    <div class="card-body text-center">
-                        <h4>
-                            {% set clientes_unicos = [] %}
-                            {% for movimiento in movimientos %}
-                                {% if movimiento.cliente_id not in clientes_unicos %}
-                                    {% set _ = clientes_unicos.append(movimiento.cliente_id) %}
-                                {% endif %}
-                            {% endfor %}
-                            {{ clientes_unicos|length }}
-                        </h4>
-                        <p class="mb-0">Clientes Atendidos</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card bg-warning text-white">
-                    <div class="card-body text-center">
-                        <h4>
-                            {% set empleados_unicos = [] %}
-                            {% for movimiento in movimientos %}
-                                {% if movimiento.empleado_id not in empleados_unicos %}
-                                    {% set _ = empleados_unicos.append(movimiento.empleado_id) %}
-                                {% endif %}
-                            {% endfor %}
-                            {{ empleados_unicos|length }}
-                        </h4>
-                        <p class="mb-0">Empleados Activos</p>
-                    </div>
-                </div>
+                </form>
             </div>
         </div>
 
-        <!-- Lista de movimientos -->
+        <!-- Lista de Movimientos -->
         <div class="card">
             <div class="card-header">
                 <h5 class="card-title mb-0">
-                    <i class="fas fa-history me-2"></i>Historial de Movimientos en Caja
+                    <i class="fas fa-list me-2"></i>Lista de Movimientos
                     <span class="badge bg-primary ms-2">{{ movimientos|length }} registros</span>
                 </h5>
             </div>
@@ -157,168 +173,70 @@
                     <table class="table table-striped table-hover">
                         <thead class="table-dark">
                             <tr>
-                                <th>No. Movimiento</th>
                                 <th>Fecha/Hora</th>
                                 <th>Empleado</th>
                                 <th>Cliente</th>
-                                <th>Tipo Cliente</th>
                                 <th>Servicio</th>
-                                <th>Tipo Documento</th>
+                                <th>Tipo Doc.</th>
                                 <th>Forma Pago</th>
                                 <th>Modalidad</th>
-                                <th>Monto</th>
+                                <th class="text-end">Monto</th>
                                 <th>Estado</th>
-                                <th class="text-center">Acciones</th>
+                                <th class="table-actions">Acciones</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for movimiento in movimientos %}
                             <tr>
-                                <td><strong>#{{ movimiento.id }}</strong></td>
                                 <td>{{ movimiento.fecha_movimiento.strftime('%d/%m/%Y %H:%M') }}</td>
+                                <td>{{ movimiento.empleado.nombre }}</td>
                                 <td>
-                                    <div class="d-flex align-items-center">
-                                        <i class="fas fa-user-tie text-primary me-2"></i>
-                                        {{ movimiento.empleado.nombre }}
-                                    </div>
-                                </td>
-                                <td>
-                                    <div class="d-flex align-items-center">
-                                        <i class="fas fa-user text-success me-2"></i>
-                                        {{ movimiento.cliente.nombre }}
-                                    </div>
-                                </td>
-                                <td>
-                                    <span class="badge bg-info">{{ movimiento.cliente.tipo_cliente }}</span>
+                                    <strong>{{ movimiento.cliente.nombre }}</strong>
+                                    <br>
+                                    <small class="text-muted">{{ movimiento.cliente.tipo_documento }}: {{ movimiento.cliente.numero_documento }}</small>
                                 </td>
                                 <td>{{ movimiento.servicio.descripcion }}</td>
-                                <td>
-                                    <span class="badge bg-secondary">{{ movimiento.tipo_documento.descripcion }}</span>
-                                </td>
+                                <td>{{ movimiento.tipo_documento.descripcion }}</td>
                                 <td>{{ movimiento.forma_pago.descripcion }}</td>
-                                <td>
-                                    <span class="badge bg-light text-dark">{{ movimiento.modalidad_pago.descripcion }}</span>
+                                <td>{{ movimiento.modalidad_pago.descripcion }}</td>
+                                <td class="text-end">
+                                    <strong>${{ "%.2f"|format(movimiento.monto) }}</strong>
                                 </td>
                                 <td>
-                                    <strong class="text-success">RD$ {{ "%.2f"|format(movimiento.monto) }}</strong>
-                                </td>
-                                <td>
-                                    <span class="badge bg-{% if movimiento.estado == 'Activo' %}success{% else %}danger{% endif %}">
+                                    <span class="badge bg-{% if movimiento.estado == 'Activo' %}success{% else %}warning{% endif %}">
                                         {{ movimiento.estado }}
                                     </span>
                                 </td>
-                                <td class="text-center">
-                                    <div class="btn-group btn-group-sm">
-                                        <button type="button" class="btn btn-outline-info" data-bs-toggle="tooltip" title="Ver detalles">
-                                            <i class="fas fa-eye"></i>
-                                        </button>
-                                        <a href="{{ url_for('eliminar_movimiento', id=movimiento.id) }}" 
-                                           class="btn btn-outline-danger" 
-                                           data-bs-toggle="tooltip" 
-                                           title="Eliminar movimiento"
-                                           onclick="return confirm('¿Está seguro de eliminar este movimiento?')">
-                                            <i class="fas fa-trash"></i>
-                                        </a>
-                                    </div>
+                                <td class="table-actions">
+                                    <a href="{{ url_for('eliminar_movimiento', id=movimiento.id) }}" 
+                                       class="btn btn-sm btn-danger" 
+                                       onclick="return confirm('¿Está seguro de eliminar este movimiento?')">
+                                        <i class="fas fa-trash me-1"></i>Eliminar
+                                    </a>
                                 </td>
                             </tr>
                             {% endfor %}
                         </tbody>
-                        <tfoot class="table-success">
+                        <tfoot class="table-primary">
                             <tr>
-                                <td colspan="9" class="text-end"><strong>Total General:</strong></td>
-                                <td colspan="3">
-                                    <strong class="text-success">
-                                        {% set total_general = 0 %}
-                                        {% for movimiento in movimientos %}
-                                            {% set total_general = total_general + movimiento.monto %}
-                                        {% endfor %}
-                                        RD$ {{ "%.2f"|format(total_general) }}
-                                    </strong>
+                                <td colspan="7" class="text-end"><strong>Total:</strong></td>
+                                <td class="text-end">
+                                    <strong>${{ "%.2f"|format(movimientos|sum(attribute='monto')) }}</strong>
                                 </td>
+                                <td colspan="2"></td>
                             </tr>
                         </tfoot>
                     </table>
                 </div>
-
-                <!-- Estadísticas por servicio -->
-                <div class="row mt-4">
-                    <div class="col-12">
-                        <div class="card">
-                            <div class="card-header">
-                                <h6 class="card-title mb-0">
-                                    <i class="fas fa-chart-pie me-2"></i>Resumen por Servicio
-                                </h6>
-                            </div>
-                            <div class="card-body">
-                                <div class="table-responsive">
-                                    <table class="table table-sm">
-                                        <thead>
-                                            <tr>
-                                                <th>Servicio</th>
-                                                <th>Cantidad</th>
-                                                <th>Monto Total</th>
-                                                <th>Porcentaje</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {% set servicios_totales = {} %}
-                                            {% set total_general_stats = 0 %}
-                                            
-                                            {% for movimiento in movimientos %}
-                                                {% set servicio_nombre = movimiento.servicio.descripcion %}
-                                                {% if servicio_nombre not in servicios_totales %}
-                                                    {% set _ = servicios_totales.update({servicio_nombre: {'cantidad': 0, 'monto': 0}}) %}
-                                                {% endif %}
-                                                {% set _ = servicios_totales[servicio_nombre].update({
-                                                    'cantidad': servicios_totales[servicio_nombre]['cantidad'] + 1, 
-                                                    'monto': servicios_totales[servicio_nombre]['monto'] + movimiento.monto
-                                                }) %}
-                                                {% set total_general_stats = total_general_stats + movimiento.monto %}
-                                            {% endfor %}
-                                            
-                                            {% for servicio, datos in servicios_totales.items() %}
-                                            <tr>
-                                                <td>{{ servicio }}</td>
-                                                <td>{{ datos.cantidad }}</td>
-                                                <td><strong>RD$ {{ "%.2f"|format(datos.monto) }}</strong></td>
-                                                <td>
-                                                    <span class="badge bg-info">
-                                                        {% if total_general_stats > 0 %}
-                                                            {{ "%.1f"|format((datos.monto / total_general_stats * 100)) }}%
-                                                        {% else %}
-                                                            0.0%
-                                                        {% endif %}
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                            {% endfor %}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
                 {% else %}
-                <div class="text-center py-5">
-                    <i class="fas fa-receipt fa-4x text-muted mb-3"></i>
-                    <h4 class="text-muted">No hay movimientos registrados</h4>
-                    <p class="text-muted">No se encontraron movimientos con los criterios especificados.</p>
+                <div class="text-center py-4">
+                    <i class="fas fa-exchange-alt fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">No hay movimientos registrados</h5>
+                    <p class="text-muted">Utilice el formulario superior para registrar el primer movimiento de caja.</p>
                 </div>
                 {% endif %}
             </div>
         </div>
     </div>
 </div>
-
-<script>
-// Inicializar tooltips
-document.addEventListener('DOMContentLoaded', function() {
-    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
-    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-        return new bootstrap.Tooltip(tooltipTriggerEl)
-    });
-});
-</script>
 {% endblock %}
