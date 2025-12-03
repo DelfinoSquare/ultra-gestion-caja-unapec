@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block page_title %}Reporte de Movimientos{% endblock %}
+{% block page_title %}Reportes y Estadísticas{% endblock %}
 
 {% block content %}
 <div class="row">
@@ -8,62 +8,102 @@
         <div class="card mb-4">
             <div class="card-header">
                 <h5 class="card-title mb-0">
-                    <i class="fas fa-chart-bar me-2"></i>Filtros del Reporte
+                    <i class="fas fa-chart-bar me-2"></i>Generar Reportes
                 </h5>
             </div>
             <div class="card-body">
                 <form method="GET" action="{{ url_for('reporte') }}">
                     <div class="row">
                         <div class="col-md-3 mb-3">
-                            <label class="form-label">Forma de Pago</label>
-                            <select class="form-select" name="forma_pago_id">
-                                <option value="">Todas las formas</option>
-                                {% for forma in formas_pago %}
-                                <option value="{{ forma.id }}" {% if request.args.get('forma_pago_id')|int == forma.id %}selected{% endif %}>
-                                    {{ forma.descripcion }}
-                                </option>
-                                {% endfor %}
-                            </select>
+                            <label class="form-label">Fecha Desde</label>
+                            <input type="date" class="form-control" name="fecha_desde" 
+                                   value="{{ fecha_desde }}">
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Fecha Hasta</label>
+                            <input type="date" class="form-control" name="fecha_hasta" 
+                                   value="{{ fecha_hasta }}">
                         </div>
                         <div class="col-md-3 mb-3">
                             <label class="form-label">Servicio</label>
                             <select class="form-select" name="servicio_id">
                                 <option value="">Todos los servicios</option>
                                 {% for servicio in servicios %}
-                                <option value="{{ servicio.id }}" {% if request.args.get('servicio_id')|int == servicio.id %}selected{% endif %}>
+                                <option value="{{ servicio.id }}" 
+                                    {% if servicio_id == servicio.id %}selected{% endif %}>
                                     {{ servicio.descripcion }}
                                 </option>
                                 {% endfor %}
                             </select>
                         </div>
                         <div class="col-md-3 mb-3">
+                            <label class="form-label">Forma de Pago</label>
+                            <select class="form-select" name="forma_pago_id">
+                                <option value="">Todas las formas</option>
+                                {% for forma in formas_pago %}
+                                <option value="{{ forma.id }}"
+                                    {% if forma_pago_id == forma.id %}selected{% endif %}>
+                                    {{ forma.descripcion }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
                             <label class="form-label">Modalidad de Pago</label>
                             <select class="form-select" name="modalidad_pago_id">
                                 <option value="">Todas las modalidades</option>
                                 {% for modalidad in modalidades_pago %}
-                                <option value="{{ modalidad.id }}" {% if request.args.get('modalidad_pago_id')|int == modalidad.id %}selected{% endif %}>
+                                <option value="{{ modalidad.id }}"
+                                    {% if modalidad_pago_id == modalidad.id %}selected{% endif %}>
                                     {{ modalidad.descripcion }}
                                 </option>
                                 {% endfor %}
                             </select>
                         </div>
-                        <div class="col-md-3 mb-3">
-                            <label class="form-label">Fecha Desde</label>
-                            <input type="date" class="form-control" name="fecha_desde" value="{{ request.args.get('fecha_desde', '') }}">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Tipo de Documento</label>
+                            <select class="form-select" name="tipo_documento_id">
+                                <option value="">Todos los tipos</option>
+                                {% for tipo in tipos_documentos %}
+                                <option value="{{ tipo.id }}"
+                                    {% if tipo_documento_id == tipo.id %}selected{% endif %}>
+                                    {{ tipo.descripcion }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Cliente</label>
+                            <select class="form-select" name="cliente_id">
+                                <option value="">Todos los clientes</option>
+                                {% for cliente in clientes %}
+                                <option value="{{ cliente.id }}"
+                                    {% if cliente_id == cliente.id %}selected{% endif %}>
+                                    {{ cliente.nombre }}
+                                </option>
+                                {% endfor %}
+                            </select>
                         </div>
                     </div>
                     <div class="row">
-                        <div class="col-md-3 mb-3">
-                            <label class="form-label">Fecha Hasta</label>
-                            <input type="date" class="form-control" name="fecha_hasta" value="{{ request.args.get('fecha_hasta', '') }}">
-                        </div>
-                        <div class="col-md-9 mb-3 d-flex align-items-end">
+                        <div class="col-md-12 text-center">
                             <button type="submit" class="btn btn-primary me-2">
-                                <i class="fas fa-chart-bar me-2"></i>Generar Reporte
+                                <i class="fas fa-search me-2"></i>Generar Reporte
                             </button>
-                            <a href="{{ url_for('reporte') }}" class="btn btn-secondary">
-                                <i class="fas fa-undo me-2"></i>Limpiar
+                            <a href="{{ url_for('reporte') }}" class="btn btn-secondary me-2">
+                                <i class="fas fa-refresh me-2"></i>Limpiar Filtros
                             </a>
+                            {% if movimientos %}
+                            <a href="{{ url_for('exportar_pdf') }}?{{ request.query_string.decode() }}" 
+                               class="btn btn-danger me-2">
+                                <i class="fas fa-file-pdf me-2"></i>Exportar PDF
+                            </a>
+                            <button type="button" class="btn btn-success" onclick="window.print()">
+                                <i class="fas fa-print me-2"></i>Imprimir
+                            </button>
+                            {% endif %}
                         </div>
                     </div>
                 </form>
@@ -71,172 +111,314 @@
         </div>
 
         {% if movimientos %}
+        <!-- Resumen de Filtros Aplicados -->
+        <div class="alert alert-info">
+            <h6 class="alert-heading">
+                <i class="fas fa-filter me-2"></i>Filtros Aplicados:
+            </h6>
+            <div class="row">
+                {% if fecha_desde or fecha_hasta %}
+                <div class="col-md-3">
+                    <strong>Período:</strong> 
+                    {{ fecha_desde if fecha_desde else 'Inicio' }} 
+                    hasta 
+                    {{ fecha_hasta if fecha_hasta else 'Hoy' }}
+                </div>
+                {% endif %}
+                {% if servicio_id %}
+                <div class="col-md-2">
+                    <strong>Servicio:</strong> {{ servicios|selectattr('id', 'equalto', servicio_id)|map(attribute='descripcion')|first }}
+                </div>
+                {% endif %}
+                {% if forma_pago_id %}
+                <div class="col-md-2">
+                    <strong>Forma Pago:</strong> {{ formas_pago|selectattr('id', 'equalto', forma_pago_id)|map(attribute='descripcion')|first }}
+                </div>
+                {% endif %}
+                <div class="col-md-2">
+                    <strong>Resultados:</strong> {{ movimientos|length }} movimientos
+                </div>
+                <div class="col-md-3 text-end">
+                    <strong>Total:</strong> ${{ "%.2f"|format(total) }}
+                </div>
+            </div>
+        </div>
+
+        <!-- Tarjetas de Resumen -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card bg-primary text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h4 class="mb-0">{{ movimientos|length }}</h4>
+                                <p class="mb-0">Total Movimientos</p>
+                            </div>
+                            <div class="align-self-center">
+                                <i class="fas fa-exchange-alt fa-2x"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-success text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h4 class="mb-0">${{ "%.2f"|format(total) }}</h4>
+                                <p class="mb-0">Ingreso Total</p>
+                            </div>
+                            <div class="align-self-center">
+                                <i class="fas fa-dollar-sign fa-2x"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-info text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h4 class="mb-0">${{ "%.2f"|format(promedio) }}</h4>
+                                <p class="mb-0">Promedio</p>
+                            </div>
+                            <div class="align-self-center">
+                                <i class="fas fa-calculator fa-2x"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-warning text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h4 class="mb-0">${{ "%.2f"|format(movimiento_max.monto) if movimiento_max else 0 }}</h4>
+                                <p class="mb-0">Máximo</p>
+                            </div>
+                            <div class="align-self-center">
+                                <i class="fas fa-arrow-up fa-2x"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gráficos -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="card-title mb-0">
+                            <i class="fas fa-chart-pie me-2"></i>Distribución por Servicios
+                        </h6>
+                    </div>
+                    <div class="card-body text-center">
+                        <img src="{{ url_for('grafico_servicios') }}?{{ request.query_string.decode() }}" 
+                             alt="Gráfico de Servicios" class="img-fluid" style="max-height: 300px;">
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="card-title mb-0">
+                            <i class="fas fa-chart-bar me-2"></i>Distribución por Formas de Pago
+                        </h6>
+                    </div>
+                    <div class="card-body text-center">
+                        <img src="{{ url_for('grafico_formas_pago') }}?{{ request.query_string.decode() }}" 
+                             alt="Gráfico de Formas de Pago" class="img-fluid" style="max-height: 300px;">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Estadísticas por Categorías -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="card-title mb-0">
+                            <i class="fas fa-concierge-bell me-2"></i>Ingresos por Servicio
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Servicio</th>
+                                        <th class="text-end">Cantidad</th>
+                                        <th class="text-end">Total</th>
+                                        <th class="text-end">%</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for servicio in servicios %}
+                                    {% set movs_servicio = movimientos|selectattr('servicio_id', 'equalto', servicio.id)|list %}
+                                    {% if movs_servicio %}
+                                    <tr>
+                                        <td>{{ servicio.descripcion }}</td>
+                                        <td class="text-end">{{ movs_servicio|length }}</td>
+                                        <td class="text-end">${{ "%.2f"|format(movs_servicio|sum(attribute='monto')) }}</td>
+                                        <td class="text-end">{{ "%.1f"|format((movs_servicio|sum(attribute='monto') / total * 100) if total > 0 else 0) }}%</td>
+                                    </tr>
+                                    {% endif %}
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="card-title mb-0">
+                            <i class="fas fa-money-bill-wave me-2"></i>Ingresos por Forma de Pago
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Forma de Pago</th>
+                                        <th class="text-end">Cantidad</th>
+                                        <th class="text-end">Total</th>
+                                        <th class="text-end">%</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for forma in formas_pago %}
+                                    {% set movs_forma = movimientos|selectattr('forma_pago_id', 'equalto', forma.id)|list %}
+                                    {% if movs_forma %}
+                                    <tr>
+                                        <td>{{ forma.descripcion }}</td>
+                                        <td class="text-end">{{ movs_forma|length }}</td>
+                                        <td class="text-end">${{ "%.2f"|format(movs_forma|sum(attribute='monto')) }}</td>
+                                        <td class="text-end">{{ "%.1f"|format((movs_forma|sum(attribute='monto') / total * 100) if total > 0 else 0) }}%</td>
+                                    </tr>
+                                    {% endif %}
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabla Detallada -->
         <div class="card">
             <div class="card-header">
                 <h5 class="card-title mb-0">
-                    <i class="fas fa-file-alt me-2"></i>Reporte de Movimientos
-                    <span class="badge bg-success ms-2">{{ movimientos|length }} movimientos</span>
-                    <span class="badge bg-info ms-2">Total: RD$ {{ "%.2f"|format(total) }}</span>
+                    <i class="fas fa-list me-2"></i>Detalle de Movimientos
+                    <span class="badge bg-primary ms-2">{{ movimientos|length }} registros</span>
                 </h5>
             </div>
             <div class="card-body">
-                <!-- Resumen del Reporte -->
-                <div class="row mb-4">
-                    <div class="col-md-3">
-                        <div class="card bg-primary text-white">
-                            <div class="card-body text-center">
-                                <h4>{{ movimientos|length }}</h4>
-                                <p class="mb-0">Movimientos</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="card bg-success text-white">
-                            <div class="card-body text-center">
-                                <h4>RD$ {{ "%.2f"|format(total) }}</h4>
-                                <p class="mb-0">Total General</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="card bg-info text-white">
-                            <div class="card-body text-center">
-                                <h4>RD$ {{ "%.2f"|format(total / movimientos|length if movimientos|length > 0 else 0) }}</h4>
-                                <p class="mb-0">Promedio por Movimiento</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="card bg-warning text-white">
-                            <div class="card-body text-center">
-                                <h4>{{ (movimientos|map(attribute='cliente_id')|unique|list)|length }}</h4>
-                                <p class="mb-0">Clientes Únicos</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Estadísticas por Servicio -->
-                <div class="row mb-4">
-                    <div class="col-12">
-                        <div class="card">
-                            <div class="card-header">
-                                <h6 class="card-title mb-0">
-                                    <i class="fas fa-chart-pie me-2"></i>Resumen por Servicio
-                                </h6>
-                            </div>
-                            <div class="card-body">
-                                <div class="table-responsive">
-                                    <table class="table table-sm">
-                                        <thead>
-                                            <tr>
-                                                <th>Servicio</th>
-                                                <th>Cantidad</th>
-                                                <th>Monto Total</th>
-                                                <th>Porcentaje</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {% set servicios_totales = {} %}
-                                            {% for movimiento in movimientos %}
-                                                {% set servicio_nombre = movimiento.servicio.descripcion %}
-                                                {% if servicio_nombre not in servicios_totales %}
-                                                    {% set _ = servicios_totales.update({servicio_nombre: {'cantidad': 0, 'monto': 0}}) %}
-                                                {% endif %}
-                                                {% set _ = servicios_totales[servicio_nombre].update({'cantidad': servicios_totales[servicio_nombre]['cantidad'] + 1, 'monto': servicios_totales[servicio_nombre]['monto'] + movimiento.monto}) %}
-                                            {% endfor %}
-                                            
-                                            {% for servicio, datos in servicios_totales.items() %}
-                                            <tr>
-                                                <td>{{ servicio }}</td>
-                                                <td>{{ datos.cantidad }}</td>
-                                                <td>RD$ {{ "%.2f"|format(datos.monto) }}</td>
-                                                <td>{{ "%.1f"|format((datos.monto / total * 100) if total > 0 else 0) }}%</td>
-                                            </tr>
-                                            {% endfor %}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Tabla de Movimientos -->
                 <div class="table-responsive">
-                    <table class="table table-striped">
-                        <thead>
+                    <table class="table table-striped table-hover">
+                        <thead class="table-dark">
                             <tr>
-                                <th>No. Movimiento</th>
-                                <th>Fecha Movimiento</th>
+                                <th>Fecha/Hora</th>
                                 <th>Cliente</th>
                                 <th>Servicio</th>
-                                <th>Tipo Documento</th>
                                 <th>Forma Pago</th>
                                 <th>Modalidad</th>
-                                <th>Monto</th>
-                                <th>Empleado</th>
+                                <th class="text-end">Monto</th>
+                                <th>Estado</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for movimiento in movimientos %}
                             <tr>
-                                <td>{{ movimiento.id }}</td>
                                 <td>{{ movimiento.fecha_movimiento.strftime('%d/%m/%Y %H:%M') }}</td>
-                                <td>{{ movimiento.cliente.nombre }}</td>
+                                <td>
+                                    <strong>{{ movimiento.cliente.nombre }}</strong>
+                                    <br>
+                                    <small class="text-muted">{{ movimiento.cliente.tipo_documento }}: {{ movimiento.cliente.numero_documento }}</small>
+                                </td>
                                 <td>{{ movimiento.servicio.descripcion }}</td>
-                                <td>{{ movimiento.tipo_documento.descripcion }}</td>
                                 <td>{{ movimiento.forma_pago.descripcion }}</td>
                                 <td>{{ movimiento.modalidad_pago.descripcion }}</td>
-                                <td><strong>RD$ {{ "%.2f"|format(movimiento.monto) }}</strong></td>
-                                <td>{{ movimiento.empleado.nombre }}</td>
+                                <td class="text-end">
+                                    <strong>${{ "%.2f"|format(movimiento.monto) }}</strong>
+                                </td>
+                                <td>
+                                    <span class="badge bg-{% if movimiento.estado == 'Activo' %}success{% else %}warning{% endif %}">
+                                        {{ movimiento.estado }}
+                                    </span>
+                                </td>
                             </tr>
                             {% endfor %}
                         </tbody>
-                        <tfoot>
-                            <tr class="table-success">
-                                <td colspan="7" class="text-end"><strong>Total General:</strong></td>
-                                <td colspan="2"><strong>RD$ {{ "%.2f"|format(total) }}</strong></td>
+                        <tfoot class="table-primary">
+                            <tr>
+                                <td colspan="5" class="text-end"><strong>Total General:</strong></td>
+                                <td class="text-end"><strong>${{ "%.2f"|format(total) }}</strong></td>
+                                <td></td>
                             </tr>
                         </tfoot>
                     </table>
                 </div>
-
-                <!-- Botón para imprimir/exportar -->
-                <div class="mt-3">
-                    <button class="btn btn-outline-primary" onclick="window.print()">
-                        <i class="fas fa-print me-2"></i>Imprimir Reporte
-                    </button>
-                    <button class="btn btn-outline-success ms-2" onclick="exportToExcel()">
-                        <i class="fas fa-file-excel me-2"></i>Exportar a Excel
-                    </button>
-                </div>
             </div>
         </div>
+
         {% elif request.args %}
-        <div class="alert alert-info">
-            <i class="fas fa-info-circle me-2"></i>No se encontraron movimientos con los criterios especificados.
+        <!-- No hay resultados pero se aplicaron filtros -->
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">No se encontraron movimientos</h5>
+                <p class="text-muted">No hay movimientos que coincidan con los criterios de búsqueda seleccionados.</p>
+                <a href="{{ url_for('reporte') }}" class="btn btn-primary">
+                    <i class="fas fa-refresh me-2"></i>Ver Todos los Movimientos
+                </a>
+            </div>
+        </div>
+        {% else %}
+        <!-- Estado inicial (sin búsqueda) -->
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="fas fa-chart-bar fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">Generar Reporte Personalizado</h5>
+                <p class="text-muted">Seleccione los criterios de filtro y haga clic en "Generar Reporte" para analizar los movimientos.</p>
+                <div class="row mt-4">
+                    <div class="col-md-4">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h6><i class="fas fa-chart-pie me-2 text-primary"></i>Gráficos</h6>
+                                <p class="small text-muted mb-0">Visualice datos con gráficos circulares y de barras</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h6><i class="fas fa-file-pdf me-2 text-danger"></i>Exportar PDF</h6>
+                                <p class="small text-muted mb-0">Genere reportes en formato PDF profesional</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h6><i class="fas fa-filter me-2 text-success"></i>Filtros Avanzados</h6>
+                                <p class="small text-muted mb-0">Analice datos por múltiples criterios</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
         {% endif %}
     </div>
 </div>
-
-<script>
-function exportToExcel() {
-    // Crear una tabla HTML con los datos
-    let table = document.querySelector('.table-striped');
-    let html = table.outerHTML;
-    
-    // Crear un blob y descargar
-    let blob = new Blob([html], {type: 'application/vnd.ms-excel'});
-    let url = URL.createObjectURL(blob);
-    let a = document.createElement('a');
-    a.href = url;
-    a.download = 'reporte_movimientos.xls';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-}
-</script>
 {% endblock %}

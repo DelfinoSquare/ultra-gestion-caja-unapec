@@ -87,6 +87,13 @@ class MovimientoCaja(db.Model):
     cliente_id = db.Column(db.Integer, db.ForeignKey('clientes.id'), nullable=False)
     empleado_id = db.Column(db.Integer, db.ForeignKey('empleados.id'), nullable=False)
     monto = db.Column(db.Float, nullable=False)
-    descripcion = db.Column(db.Text)
+    descripcion = db.Column(db.Text)  # ← NUEVO CAMPO AÑADIDO
     fecha = db.Column(db.DateTime, nullable=False, default=db.func.now())
-    estado = db.Column(db.String(20), default='Activo')
+    
+    # Relaciones
+    tipo_documento = db.relationship('TipoDocumento', backref='movimientos')
+    servicio = db.relationship('Servicio', backref='movimientos')
+    forma_pago = db.relationship('FormaPago', backref='movimientos')
+    modalidad_pago = db.relationship('ModalidadPago', backref='movimientos')
+    cliente = db.relationship('Cliente', backref='movimientos')
+    empleado = db.relationship('Empleado', backref='movimientos')
