@@ -133,6 +133,16 @@
                         </li>
                         {% endif %}
 
+                        <!-- Módulo Financiero (Solo ADMIN y GERENTE) -->
+                        {% if current_user.is_authenticated and current_user.rol.nombre in ['ADMIN', 'GERENTE'] %}
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint in ['dashboard_financiero', 'presupuestos', 'analisis_tendencias'] %}active{% endif %}" 
+                               href="{{ url_for('dashboard_financiero') }}">
+                                <i class="fas fa-chart-line me-2"></i>Financiero
+                            </a>
+                        </li>
+                        {% endif %}
+
                         <!-- Separador para Administración -->
                         {% if current_user.is_authenticated and current_user.rol.nombre in ['ADMIN', 'GERENTE'] %}
                         <li class="nav-item mt-3">

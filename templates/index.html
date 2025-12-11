@@ -75,8 +75,30 @@
                         </a>
                     </div>
                     <div class="col-md-3 mb-3">
-                        <a href="{{ url_for('clientes') }}" class="btn btn-warning w-100">
+                        <a href="{{ url_for('nueva_factura') }}" class="btn btn-warning w-100">
+                            <i class="fas fa-file-invoice-dollar me-2"></i>Nueva Factura
+                        </a>
+                    </div>
+                </div>
+                <div class="row mt-2">
+                    <div class="col-md-3 mb-3">
+                        <a href="{{ url_for('clientes') }}" class="btn btn-secondary w-100">
                             <i class="fas fa-user-plus me-2"></i>Agregar Cliente
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <a href="{{ url_for('buscar_facturas') }}" class="btn btn-danger w-100">
+                            <i class="fas fa-search-dollar me-2"></i>Buscar Facturas
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <a href="{{ url_for('reporte_cartera') }}" class="btn btn-dark w-100">
+                            <i class="fas fa-chart-pie me-2"></i>Reporte Cartera
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <a href="{{ url_for('dashboard_facturacion') }}" class="btn btn-success w-100">
+                            <i class="fas fa-tachometer-alt me-2"></i>Dashboard Facturación
                         </a>
                     </div>
                 </div>
@@ -121,6 +143,125 @@
                                 <p class="text-muted">Gestión de contado, crédito, T-Pago, página, etc.</p>
                                 <a href="{{ url_for('formas_pago') }}" class="btn btn-outline-info">Gestionar</a>
                             </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Segunda fila de módulos -->
+                <div class="row mt-3">
+                    <div class="col-md-4 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body text-center">
+                                <i class="fas fa-calendar-alt fa-3x text-warning mb-3"></i>
+                                <h5>Modalidades de Pago</h5>
+                                <p class="text-muted">Gestión de pagos en cuotas, mensualidades, etc.</p>
+                                <a href="{{ url_for('modalidades_pago') }}" class="btn btn-outline-warning">Gestionar</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body text-center">
+                                <i class="fas fa-file-invoice-dollar fa-3x text-danger mb-3"></i>
+                                <h5>Módulo de Facturación</h5>
+                                <p class="text-muted">Gestión completa de facturas, cobranza y reportes</p>
+                                <a href="{{ url_for('dashboard_facturacion') }}" class="btn btn-outline-danger">Acceder</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body text-center">
+                                <i class="fas fa-chart-line fa-3x text-dark mb-3"></i>
+                                <h5>Dashboard Financiero</h5>
+                                <p class="text-muted">Análisis financiero, presupuestos y tendencias</p>
+                                <a href="{{ url_for('dashboard_financiero') }}" class="btn btn-outline-dark">Acceder</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Acceso directo para administradores -->
+{% if current_user.rol.nombre in ['ADMIN', 'GERENTE'] %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-dark text-white">
+                <h5 class="card-title mb-0"><i class="fas fa-user-shield me-2"></i>Panel de Administración</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <a href="{{ url_for('admin_usuarios') }}" class="btn btn-outline-dark w-100">
+                            <i class="fas fa-users-cog me-2"></i>Usuarios
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <a href="{{ url_for('admin_roles') }}" class="btn btn-outline-dark w-100">
+                            <i class="fas fa-user-tag me-2"></i>Roles
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <a href="{{ url_for('dashboard_gerencial_facturacion') }}" class="btn btn-outline-dark w-100">
+                            <i class="fas fa-chart-pie me-2"></i>Dashboard Gerencial
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <a href="{{ url_for('presupuestos') }}" class="btn btn-outline-dark w-100">
+                            <i class="fas fa-coins me-2"></i>Presupuestos
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Sección de estado del sistema -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0"><i class="fas fa-info-circle me-2"></i>Estado del Sistema</h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-md-3 mb-3">
+                        <div class="p-3 bg-primary bg-opacity-10 rounded">
+                            <i class="fas fa-database fa-2x text-primary mb-2"></i>
+                            <h6>Base de Datos</h6>
+                            <p class="mb-0 text-success">Operativa</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="p-3 bg-success bg-opacity-10 rounded">
+                            <i class="fas fa-file-signature fa-2x text-success mb-2"></i>
+                            <h6>Facturación</h6>
+                            <p class="mb-0">
+                                <a href="{{ url_for('dashboard_facturacion') }}" class="text-success">Activo</a>
+                            </p>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="p-3 bg-warning bg-opacity-10 rounded">
+                            <i class="fas fa-shield-alt fa-2x text-warning mb-2"></i>
+                            <h6>Seguridad</h6>
+                            <p class="mb-0">Rol: {{ current_user.rol.nombre }}</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="p-3 bg-info bg-opacity-10 rounded">
+                            <i class="fas fa-cogs fa-2x text-info mb-2"></i>
+                            <h6>Sesión</h6>
+                            <p class="mb-0">
+                                {{ current_user.username }}<br>
+                                <small>{{ current_user.email }}</small>
+                            </p>
                         </div>
                     </div>
                 </div>
