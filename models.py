@@ -1,4 +1,8 @@
 from flask_sqlalchemy import SQLAlchemy
+from datetime import datetime, date
+from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import Numeric
+
 
 db = SQLAlchemy()
 
@@ -97,3 +101,44 @@ class MovimientoCaja(db.Model):
     modalidad_pago = db.relationship('ModalidadPago', backref='movimientos')
     cliente = db.relationship('Cliente', backref='movimientos')
     empleado = db.relationship('Empleado', backref='movimientos')
+
+
+    # Modelos existentes... y agregamos:
+
+class CierreDiario(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    fecha = db.Column(db.Date, nullable=False, default=date.today)
+    total_ingresos = db.Column(Numeric(15, 2), nullable=False, default=0)
+    total_egresos = db.Column(Numeric(15, 2), nullable=False, default=0)
+    saldo_final = db.Column(Numeric(15, 2), nullable=False, default=0)
+    estado = db.Column(db.String(20), default='Abierto')
+    created_at = db.Column(db.DateTime, default=datetime.now)
+
+class Presupuesto(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    año = db.Column(db.Integer, nullable=False)
+    mes = db.Column(db.Integer, nullable=False)
+    servicio_id = db.Column(db.Integer, db.ForeignKey('servicio.id'), nullable=False)
+    monto_presupuestado = db.Column(Numeric(15, 2), nullable=False)
+    monto_ejecutado = db.Column(Numeric(15, 2), default=0)
+    desviacion = db.Column(Numeric(15, 2), default=0)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    
+    servicio = db.relationship('Servicio', backref='presupuestos')
+
+class FlujoCaja(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    fecha = db.Column(db.Date, nullable=False, default=date.today)
+    tipo = db.Column(db.String(20), nullable=False)  # 'Ingreso' o 'Egreso'
+    categoria = db.Column(db.String(100), nullable=False)
+    descripcion = db.Column(db.Text)
+    monto = db.Column(Numeric(15, 2), nullable=False)
+    saldo_acumulado = db.Column(Numeric(15, 2), default=0)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+
+class IndicadorFinanciero(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    nombre = db.Column(db.String(100), nullable=False)
+    valor = db.Column(Numeric(15, 4), nullable=False)
+    fecha_calculo = db.Column(db.DateTime, default=datetime.now)
+    tipo = db.Column(db.String(50))  # 'Liquidez', 'Rentabilidad', 'Eficiencia'

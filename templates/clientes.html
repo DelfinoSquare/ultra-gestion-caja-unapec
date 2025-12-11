@@ -76,12 +76,48 @@
         <div class="card">
             <div class="card-header">
                 <h5 class="card-title mb-0">
-                    <i class="fas fa-list me-2"></i>Lista de Clientes
+                    <i class="fas fa-list me-2"></i>Lista de Clientes ({{ clientes|length }} registros)
                 </h5>
             </div>
             <div class="card-body">
+                <!-- Estadísticas Rápidas -->
+                <div class="row mb-4">
+                    <div class="col-md-3 col-6">
+                        <div class="text-center p-3 bg-primary bg-opacity-10 rounded">
+                            <h6 class="text-muted">Total Clientes</h6>
+                            <h4 class="text-primary">{{ clientes|length }}</h4>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <div class="text-center p-3 bg-success bg-opacity-10 rounded">
+                            <h6 class="text-muted">Activos</h6>
+                            <h4 class="text-success">{{ clientes|selectattr('estado', 'equalto', 'Activo')|list|length }}</h4>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <div class="text-center p-3 bg-warning bg-opacity-10 rounded">
+                            <h6 class="text-muted">Inactivos</h6>
+                            <h4 class="text-warning">{{ clientes|selectattr('estado', 'equalto', 'Inactivo')|list|length }}</h4>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <div class="text-center p-3 bg-info bg-opacity-10 rounded">
+                            <h6 class="text-muted">Con Facturas</h6>
+                            <h4 class="text-info">
+                                {% set con_facturas = [] %}
+                                {% for cliente in clientes %}
+                                    {% if cliente.facturas|length > 0 %}
+                                        {% set _ = con_facturas.append(1) %}
+                                    {% endif %}
+                                {% endfor %}
+                                {{ con_facturas|length }}
+                            </h4>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="table-responsive">
-                    <table class="table table-striped">
+                    <table class="table table-striped table-hover">
                         <thead>
                             <tr>
                                 <th>ID</th>
@@ -93,6 +129,7 @@
                                 <th>Tipo Cliente</th>
                                 <th>Carrera</th>
                                 <th>Estado</th>
+                                <th>Saldo</th>
                                 <th class="table-actions">Acciones</th>
                             </tr>
                         </thead>
@@ -100,7 +137,19 @@
                             {% for cliente in clientes %}
                             <tr>
                                 <td>{{ cliente.id }}</td>
-                                <td>{{ cliente.nombre }}</td>
+                                <td>
+                                    <strong>
+                                        <a href="{{ url_for('saldo_cliente', cliente_id=cliente.id) }}" 
+                                           class="text-decoration-none" title="Ver estado de cuenta">
+                                            {{ cliente.nombre }}
+                                        </a>
+                                    </strong>
+                                    {% if cliente.facturas|length > 0 %}
+                                    <span class="badge bg-info ms-1" title="{{ cliente.facturas|length }} factura(s)">
+                                        {{ cliente.facturas|length }}
+                                    </span>
+                                    {% endif %}
+                                </td>
                                 <td>{{ cliente.tipo_documento }}</td>
                                 <td>{{ cliente.numero_documento }}</td>
                                 <td>{{ cliente.telefono or '-' }}</td>
@@ -112,13 +161,45 @@
                                         {{ cliente.estado }}
                                     </span>
                                 </td>
+                                <td>
+                                    {% set saldo_total = cliente.facturas|sum(attribute='saldo_pendiente') %}
+                                    {% if saldo_total > 0 %}
+                                        <span class="badge bg-danger" title="Saldo pendiente">
+                                            {{ formato_moneda(saldo_total) }}
+                                        </span>
+                                    {% elif saldo_total == 0 and cliente.facturas|length > 0 %}
+                                        <span class="badge bg-success" title="Al día">
+                                            <i class="fas fa-check"></i>
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-secondary" title="Sin facturas">
+                                            -
+                                        </span>
+                                    {% endif %}
+                                </td>
                                 <td class="table-actions">
-                                    <button type="button" class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editModal{{ cliente.id }}">
-                                        <i class="fas fa-edit me-1"></i>Editar
-                                    </button>
-                                    <a href="{{ url_for('eliminar_cliente', id=cliente.id) }}" class="btn btn-sm btn-danger" onclick="return confirmDelete()">
-                                        <i class="fas fa-trash me-1"></i>Eliminar
-                                    </a>
+                                    <div class="btn-group" role="group">
+                                        <a href="{{ url_for('saldo_cliente', cliente_id=cliente.id) }}" 
+                                           class="btn btn-sm btn-info" title="Ver estado de cuenta">
+                                            <i class="fas fa-dollar-sign"></i>
+                                        </a>
+                                        <a href="{{ url_for('nueva_factura') }}?cliente_id={{ cliente.id }}" 
+                                           class="btn btn-sm btn-success" title="Nueva factura">
+                                            <i class="fas fa-file-invoice"></i>
+                                        </a>
+                                        <button type="button" class="btn btn-sm btn-warning" 
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#editModal{{ cliente.id }}"
+                                                title="Editar">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <a href="{{ url_for('eliminar_cliente', id=cliente.id) }}" 
+                                           class="btn btn-sm btn-danger" 
+                                           onclick="return confirmDelete()"
+                                           title="Eliminar">
+                                            <i class="fas fa-trash"></i>
+                                        </a>
+                                    </div>
                                 </td>
                             </tr>
 
@@ -127,7 +208,9 @@
                                 <div class="modal-dialog modal-lg">
                                     <div class="modal-content">
                                         <div class="modal-header">
-                                            <h5 class="modal-title">Editar Cliente</h5>
+                                            <h5 class="modal-title">
+                                                <i class="fas fa-edit me-2"></i>Editar Cliente: {{ cliente.nombre }}
+                                            </h5>
                                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                         </div>
                                         <form method="POST" action="{{ url_for('editar_cliente', id=cliente.id) }}">
@@ -182,10 +265,37 @@
                                                         </select>
                                                     </div>
                                                 </div>
+                                                
+                                                <!-- Información de Facturación -->
+                                                <div class="alert alert-info mt-3">
+                                                    <h6><i class="fas fa-file-invoice-dollar me-2"></i>Información de Facturación:</h6>
+                                                    <div class="row">
+                                                        <div class="col-md-6">
+                                                            <small>Total Facturas: {{ cliente.facturas|length }}</small><br>
+                                                            <small>Facturas Pendientes: 
+                                                                {{ cliente.facturas|selectattr('estado', 'in', ['Pendiente', 'Parcial', 'Vencida'])|list|length }}
+                                                            </small>
+                                                        </div>
+                                                        <div class="col-md-6">
+                                                            <small>Saldo Total: 
+                                                                <span class="{% if saldo_total > 0 %}text-danger{% else %}text-success{% endif %}">
+                                                                    {{ formato_moneda(saldo_total) }}
+                                                                </span>
+                                                            </small><br>
+                                                            <small>
+                                                                <a href="{{ url_for('saldo_cliente', cliente_id=cliente.id) }}" class="text-decoration-none">
+                                                                    <i class="fas fa-external-link-alt"></i> Ver estado de cuenta completo
+                                                                </a>
+                                                            </small>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </div>
                                             <div class="modal-footer">
                                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                                                <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                                                <button type="submit" class="btn btn-primary">
+                                                    <i class="fas fa-save me-2"></i>Guardar Cambios
+                                                </button>
                                             </div>
                                         </form>
                                     </div>
@@ -193,7 +303,11 @@
                             </div>
                             {% else %}
                             <tr>
-                                <td colspan="10" class="text-center text-muted">No hay clientes registrados</td>
+                                <td colspan="11" class="text-center text-muted py-4">
+                                    <i class="fas fa-users fa-2x mb-3"></i>
+                                    <p>No hay clientes registrados</p>
+                                    <p class="small">Comienza agregando un cliente usando el formulario superior</p>
+                                </td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -203,4 +317,64 @@
         </div>
     </div>
 </div>
+
+<!-- JavaScript adicional -->
+<script>
+function confirmDelete() {
+    return confirm('¿Está seguro de eliminar este cliente?\n\n⚠️ Advertencia: Si el cliente tiene facturas asociadas, no podrá ser eliminado.');
+}
+
+// Buscar clientes rápidamente
+function searchClients() {
+    const input = document.getElementById('searchInput');
+    const filter = input.value.toUpperCase();
+    const table = document.querySelector('table');
+    const rows = table.getElementsByTagName('tr');
+    
+    for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        const cells = row.getElementsByTagName('td');
+        let found = false;
+        
+        for (let j = 0; j < cells.length; j++) {
+            const cell = cells[j];
+            if (cell) {
+                const text = cell.textContent || cell.innerText;
+                if (text.toUpperCase().indexOf(filter) > -1) {
+                    found = true;
+                    break;
+                }
+            }
+        }
+        
+        if (found) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    }
+}
+
+// Agregar campo de búsqueda dinámico
+document.addEventListener('DOMContentLoaded', function() {
+    const cardHeader = document.querySelector('.card-header');
+    const searchDiv = document.createElement('div');
+    searchDiv.className = 'mt-3';
+    searchDiv.innerHTML = `
+        <div class="input-group">
+            <span class="input-group-text"><i class="fas fa-search"></i></span>
+            <input type="text" id="searchInput" class="form-control" 
+                   placeholder="Buscar clientes por nombre, documento, email..." 
+                   onkeyup="searchClients()">
+            <button class="btn btn-outline-secondary" type="button" onclick="searchClients()">
+                Buscar
+            </button>
+        </div>
+    `;
+    
+    if (cardHeader) {
+        cardHeader.parentNode.insertBefore(searchDiv, cardHeader.nextSibling);
+    }
+});
+</script>
 {% endblock %}

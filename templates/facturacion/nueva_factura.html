@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nueva Factura - Sistema UNAPEC</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .form-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+            border-radius: 0 0 20px 20px;
+        }
+        
+        .form-card {
+            border-radius: 15px;
+            border: none;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+        }
+        
+        .required-label::after {
+            content: " *";
+            color: #dc3545;
+        }
+        
+        .cliente-info {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 1rem;
+            border-left: 4px solid #667eea;
+            transition: all 0.3s;
+        }
+        
+        .servicio-card {
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 0.5rem;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .servicio-card:hover {
+            border-color: #0d6efd;
+            background-color: #f0f8ff;
+        }
+        
+        .servicio-card.selected {
+            border-color: #0d6efd;
+            background-color: #e7f3ff;
+            box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+        }
+        
+        .servicio-icon {
+            font-size: 1.5rem;
+            color: #0d6efd;
+        }
+        
+        .preview-box {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 1.5rem;
+            border: 2px dashed #dee2e6;
+        }
+        
+        .btn-generate {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            font-size: 1.1rem;
+            font-weight: 500;
+        }
+        
+        .loading-spinner {
+            display: none;
+            text-align: center;
+            padding: 1rem;
+        }
+        
+        .alert-servicios {
+            border-left: 4px solid #20c997;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="form-header">
+            <div class="container">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h1 class="h3 mb-2"><i class="fas fa-file-invoice me-2"></i>Nueva Factura</h1>
+                        <p class="mb-0">Complete los datos para generar una nueva factura</p>
+                    </div>
+                    <div>
+                        <a href="{{ url_for('dashboard_facturacion') }}" class="btn btn-light">
+                            <i class="fas fa-arrow-left me-2"></i>Volver al Dashboard
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Formulario -->
+        <form method="POST" action="{{ url_for('nueva_factura') }}" id="facturaForm">
+            <div class="row">
+                <!-- Datos del Cliente -->
+                <div class="col-lg-6 mb-4">
+                    <div class="card form-card">
+                        <div class="card-header bg-white">
+                            <h5 class="mb-0"><i class="fas fa-user me-2"></i>Datos del Cliente</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label for="cliente_id" class="form-label required-label">Seleccionar Cliente</label>
+                                <select class="form-select" id="cliente_id" name="cliente_id" required 
+                                        onchange="cargarServiciosCliente()">
+                                    <option value="">-- Seleccione un cliente --</option>
+                                    {% for cliente in clientes %}
+                                    <option value="{{ cliente.id }}" 
+                                            {% if cliente_seleccionado_id == cliente.id %}selected{% endif %}>
+                                        {{ cliente.nombre }} - {{ cliente.tipo_documento }}: {{ cliente.numero_documento }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            
+                            <div id="cliente-info" class="cliente-info" style="display: none;">
+                                <h6 class="mb-2">Información del Cliente:</h6>
+                                <p id="cliente-detail" class="mb-1 small"></p>
+                                <p id="cliente-contact" class="mb-0 small text-muted"></p>
+                            </div>
+                            
+                            <!-- Spinner de carga -->
+                            <div id="loading-servicios" class="loading-spinner">
+                                <div class="spinner-border spinner-border-sm text-primary me-2" role="status">
+                                    <span class="visually-hidden">Cargando...</span>
+                                </div>
+                                <small class="text-muted">Cargando servicios del cliente...</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Datos del Servicio -->
+                <div class="col-lg-6 mb-4">
+                    <div class="card form-card">
+                        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="fas fa-concierge-bell me-2"></i>Datos del Servicio</h5>
+                            <span id="contador-servicios" class="badge bg-secondary">0 servicios</span>
+                        </div>
+                        <div class="card-body">
+                            <!-- Alert cuando no hay servicios -->
+                            <div id="alert-no-servicios" class="alert alert-warning alert-servicios" style="display: none;">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                Este cliente no tiene servicios contratados. Seleccione uno manualmente.
+                            </div>
+                            
+                            <!-- Lista de servicios del cliente -->
+                            <div id="lista-servicios-cliente" class="mb-3" style="display: none;">
+                                <label class="form-label required-label mb-2">Servicios Contratados</label>
+                                <div id="servicios-container">
+                                    <!-- Los servicios se cargarán aquí dinámicamente -->
+                                </div>
+                                <small class="text-muted">Haga clic en un servicio para seleccionarlo</small>
+                            </div>
+                            
+                            <!-- Selector manual de servicio (si no hay servicios o falla) -->
+                            <div id="selector-manual-servicio" class="mb-3">
+                                <label for="servicio_id" class="form-label required-label">Servicio Manual</label>
+                                <select class="form-select" id="servicio_id" name="servicio_id">
+                                    <option value="">-- Seleccione un servicio --</option>
+                                    {% for servicio in servicios %}
+                                    <option value="{{ servicio.id }}" 
+                                            data-descripcion="{{ servicio.descripcion }}">
+                                        {{ servicio.descripcion }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="monto_total" class="form-label required-label">Monto Total</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control" id="monto_total" name="monto_total" 
+                                           step="0.01" min="0.01" required 
+                                           value="{{ "%.2f"|format(monto_default) if monto_default else '' }}"
+                                           placeholder="0.00">
+                                </div>
+                                <small class="text-muted">El monto se llena automáticamente al seleccionar un servicio</small>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="dias_vencimiento" class="form-label">Días para Vencimiento</label>
+                                <input type="number" class="form-control" id="dias_vencimiento" name="dias_vencimiento" 
+                                       value="30" min="1" max="365">
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="descripcion" class="form-label">Descripción Adicional</label>
+                                <textarea class="form-control" id="descripcion" name="descripcion" 
+                                          rows="3" placeholder="Detalles adicionales de la factura..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Vista Previa y Botones -->
+            <div class="row">
+                <div class="col-lg-8 mb-4">
+                    <div class="card form-card">
+                        <div class="card-header bg-white">
+                            <h5 class="mb-0"><i class="fas fa-eye me-2"></i>Vista Previa de la Factura</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="preview-box">
+                                <div class="text-center mb-4">
+                                    <h4 class="text-primary">UNAPEC - FACTURA</h4>
+                                    <p class="text-muted mb-0">Número: <span id="preview-numero">FAC-{{ datetime.now().year }}{{ "%02d"|format(datetime.now().month) }}-XXXX</span></p>
+                                </div>
+                                
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <h6>Cliente:</h6>
+                                        <p id="preview-cliente" class="text-muted">Seleccione un cliente</p>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <h6>Servicio:</h6>
+                                        <p id="preview-servicio" class="text-muted">Seleccione un servicio</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <h6>Fecha Emisión:</h6>
+                                        <p class="text-muted">{{ datetime.now().strftime('%d/%m/%Y') }}</p>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <h6>Fecha Vencimiento:</h6>
+                                        <p id="preview-vencimiento" class="text-muted">
+                                            {% set hoy = datetime.now() %}
+                                            {% set dias = 30 %}
+                                            {% set dia = hoy.day + dias %}
+                                            {% set mes = hoy.month %}
+                                            {% set año = hoy.year %}
+                                            
+                                            {% if dia > 31 %}
+                                                {% set dia = dia - 31 %}
+                                                {% set mes = mes + 1 %}
+                                                {% if mes > 12 %}
+                                                    {% set mes = 1 %}
+                                                    {% set año = año + 1 %}
+                                                {% endif %}
+                                            {% endif %}
+                                            
+                                            {{ "%02d/%02d/%d"|format(dia, mes, año) }}
+                                        </p>
+                                    </div>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-12">
+                                        <h6>Monto Total:</h6>
+                                        <h3 id="preview-monto" class="text-primary">$0.00</h3>
+                                    </div>
+                                </div>
+                                
+                                {% if descripcion %}
+                                <div class="row mt-3">
+                                    <div class="col-12">
+                                        <h6>Descripción:</h6>
+                                        <p class="text-muted" id="preview-descripcion">{{ descripcion }}</p>
+                                    </div>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-4 mb-4">
+                    <div class="card form-card">
+                        <div class="card-header bg-white">
+                            <h5 class="mb-0"><i class="fas fa-cog me-2"></i>Opciones</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-generate">
+                                    <i class="fas fa-file-invoice-dollar me-2"></i>Generar Factura
+                                </button>
+                                
+                                <button type="reset" class="btn btn-outline-secondary" onclick="resetForm()">
+                                    <i class="fas fa-redo me-2"></i>Limpiar Formulario
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Datos de clientes para mostrar info
+        const clientesData = {
+            {% for cliente in clientes %}
+            {{ cliente.id }}: {
+                nombre: "{{ cliente.nombre }}",
+                documento: "{{ cliente.tipo_documento }}: {{ cliente.numero_documento }}",
+                telefono: "{{ cliente.telefono or 'No disponible' }}",
+                email: "{{ cliente.email or 'No disponible' }}"
+            },
+            {% endfor %}
+        };
+        
+        // Servicio seleccionado actualmente
+        let servicioSeleccionado = null;
+        
+        // Evento cambio de cliente
+        document.getElementById('cliente_id').addEventListener('change', function() {
+            const clienteId = this.value;
+            const infoDiv = document.getElementById('cliente-info');
+            const detailP = document.getElementById('cliente-detail');
+            const contactP = document.getElementById('cliente-contact');
+            const previewCliente = document.getElementById('preview-cliente');
+            
+            if (clienteId && clientesData[clienteId]) {
+                const cliente = clientesData[clienteId];
+                infoDiv.style.display = 'block';
+                detailP.innerHTML = `<strong>${cliente.nombre}</strong><br>${cliente.documento}`;
+                contactP.innerHTML = `Tel: ${cliente.telefono} | Email: ${cliente.email}`;
+                previewCliente.textContent = cliente.nombre;
+                
+                // Cargar servicios del cliente
+                cargarServiciosCliente();
+            } else {
+                infoDiv.style.display = 'none';
+                previewCliente.textContent = 'Seleccione un cliente';
+                ocultarServiciosCliente();
+            }
+        });
+        
+        // Función para cargar servicios del cliente
+        async function cargarServiciosCliente() {
+            const clienteId = document.getElementById('cliente_id').value;
+            
+            if (!clienteId) {
+                ocultarServiciosCliente();
+                return;
+            }
+            
+            // Mostrar spinner
+            document.getElementById('loading-servicios').style.display = 'block';
+            document.getElementById('alert-no-servicios').style.display = 'none';
+            document.getElementById('lista-servicios-cliente').style.display = 'none';
+            
+            try {
+                // Hacer petición a la API
+                const response = await fetch(`/api/servicios-cliente/${clienteId}`);
+                const data = await response.json();
+                
+                // Ocultar spinner
+                document.getElementById('loading-servicios').style.display = 'none';
+                
+                if (data.success && data.servicios.length > 0) {
+                    // Mostrar servicios del cliente
+                    mostrarServiciosCliente(data.servicios);
+                    document.getElementById('contador-servicios').textContent = `${data.servicios.length} servicios`;
+                    document.getElementById('contador-servicios').className = 'badge bg-success';
+                } else {
+                    // No hay servicios contratados
+                    mostrarSelectorManual();
+                    document.getElementById('contador-servicios').textContent = '0 servicios';
+                    document.getElementById('contador-servicios').className = 'badge bg-warning';
+                    document.getElementById('alert-no-servicios').style.display = 'block';
+                }
+                
+            } catch (error) {
+                console.error('Error cargando servicios:', error);
+                document.getElementById('loading-servicios').style.display = 'none';
+                mostrarSelectorManual();
+                document.getElementById('contador-servicios').textContent = 'Error';
+                document.getElementById('contador-servicios').className = 'badge bg-danger';
+            }
+        }
+        
+        // Función para mostrar servicios del cliente
+        function mostrarServiciosCliente(servicios) {
+            const container = document.getElementById('servicios-container');
+            container.innerHTML = '';
+            
+            servicios.forEach((servicio, index) => {
+                const servicioDiv = document.createElement('div');
+                servicioDiv.className = 'servicio-card';
+                servicioDiv.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <i class="fas fa-concierge-bell servicio-icon me-2"></i>
+                            <strong>${servicio.descripcion}</strong>
+                        </div>
+                        <div class="text-end">
+                            <div class="text-primary fw-bold">$${servicio.monto_contratado.toFixed(2)}</div>
+                            <small class="text-muted">Contratado: ${servicio.fecha_contratacion}</small>
+                        </div>
+                    </div>
+                `;
+                
+                // Evento click en el servicio
+                servicioDiv.addEventListener('click', () => {
+                    seleccionarServicio(servicio.id, servicio.descripcion, servicio.monto_contratado);
+                    
+                    // Remover selección anterior
+                    document.querySelectorAll('.servicio-card').forEach(card => {
+                        card.classList.remove('selected');
+                    });
+                    
+                    // Marcar como seleccionado
+                    servicioDiv.classList.add('selected');
+                });
+                
+                container.appendChild(servicioDiv);
+                
+                // Seleccionar automáticamente el primer servicio
+                if (index === 0) {
+                    seleccionarServicio(servicio.id, servicio.descripcion, servicio.monto_contratado);
+                    servicioDiv.classList.add('selected');
+                }
+            });
+            
+            // Mostrar lista y ocultar selector manual
+            document.getElementById('lista-servicios-cliente').style.display = 'block';
+            document.getElementById('selector-manual-servicio').style.display = 'none';
+        }
+        
+        // Función para seleccionar un servicio
+        function seleccionarServicio(id, descripcion, monto) {
+            servicioSeleccionado = { id, descripcion, monto };
+            
+            // Actualizar campos del formulario
+            document.getElementById('servicio_id').value = id;
+            document.getElementById('monto_total').value = monto.toFixed(2);
+            
+            // Actualizar vista previa
+            document.getElementById('preview-servicio').textContent = descripcion;
+            document.getElementById('preview-monto').textContent = `$${monto.toFixed(2)}`;
+            
+            // Actualizar monto en vista previa
+            actualizarPreviewMonto();
+        }
+        
+        // Función para mostrar selector manual
+        function mostrarSelectorManual() {
+            document.getElementById('lista-servicios-cliente').style.display = 'none';
+            document.getElementById('selector-manual-servicio').style.display = 'block';
+            document.getElementById('servicio_id').selectedIndex = 0;
+            document.getElementById('monto_total').value = '';
+        }
+        
+        // Función para ocultar servicios del cliente
+        function ocultarServiciosCliente() {
+            document.getElementById('lista-servicios-cliente').style.display = 'none';
+            document.getElementById('selector-manual-servicio').style.display = 'block';
+            document.getElementById('contador-servicios').textContent = '0 servicios';
+            document.getElementById('contador-servicios').className = 'badge bg-secondary';
+        }
+        
+        // Evento cambio de servicio manual
+        document.getElementById('servicio_id').addEventListener('change', function() {
+            const selectedOption = this.options[this.selectedIndex];
+            const previewServicio = document.getElementById('preview-servicio');
+            
+            if (selectedOption.value) {
+                previewServicio.textContent = selectedOption.textContent;
+            } else {
+                previewServicio.textContent = 'Seleccione un servicio';
+            }
+        });
+        
+        // Evento cambio de monto
+        document.getElementById('monto_total').addEventListener('input', function() {
+            actualizarPreviewMonto();
+        });
+        
+        // Función para actualizar monto en vista previa
+        function actualizarPreviewMonto() {
+            const monto = parseFloat(document.getElementById('monto_total').value) || 0;
+            document.getElementById('preview-monto').textContent = `$${monto.toFixed(2)}`;
+        }
+        
+        // Evento cambio de días vencimiento
+        document.getElementById('dias_vencimiento').addEventListener('input', function() {
+            const dias = parseInt(this.value) || 30;
+            const hoy = new Date();
+            const vencimiento = new Date(hoy);
+            vencimiento.setDate(hoy.getDate() + dias);
+            
+            const previewVencimiento = document.getElementById('preview-vencimiento');
+            const formattedDate = vencimiento.toLocaleDateString('es-ES', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            });
+            previewVencimiento.textContent = formattedDate;
+        });
+        
+        // Función para resetear el formulario
+        function resetForm() {
+            servicioSeleccionado = null;
+            ocultarServiciosCliente();
+            document.getElementById('cliente-info').style.display = 'none';
+            document.getElementById('preview-cliente').textContent = 'Seleccione un cliente';
+            document.getElementById('preview-servicio').textContent = 'Seleccione un servicio';
+            document.getElementById('preview-monto').textContent = '$0.00';
+            document.getElementById('contador-servicios').textContent = '0 servicios';
+            document.getElementById('contador-servicios').className = 'badge bg-secondary';
+        }
+        
+        // Evento cambio de descripción
+        document.getElementById('descripcion').addEventListener('input', function() {
+            const previewDescripcion = document.getElementById('preview-descripcion');
+            previewDescripcion.textContent = this.value || '';
+        });
+        
+        // Cargar servicios automáticamente si hay un cliente seleccionado por URL
+        document.addEventListener('DOMContentLoaded', function() {
+            const clienteId = document.getElementById('cliente_id').value;
+            if (clienteId) {
+                // Disparar evento change para cargar info
+                document.getElementById('cliente_id').dispatchEvent(new Event('change'));
+            }
+        });
+    </script>
+</body>
+</html>

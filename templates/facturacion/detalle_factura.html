@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detalle Factura - Sistema UNAPEC</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .invoice-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+            border-radius: 0 0 20px 20px;
+        }
+        
+        .invoice-card {
+            border-radius: 15px;
+            border: none;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+            margin-bottom: 1.5rem;
+        }
+        
+        .badge-estado {
+            padding: 0.6rem 1.2rem;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+        
+        .pago-card {
+            border-left: 4px solid #28a745;
+            transition: all 0.3s;
+        }
+        
+        .pago-card:hover {
+            transform: translateX(5px);
+        }
+        
+        .btn-action {
+            min-width: 40px;
+        }
+        
+        .progreso-pago {
+            height: 10px;
+            border-radius: 5px;
+            background-color: #e9ecef;
+            overflow: hidden;
+        }
+        
+        .progreso-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #28a745, #20c997);
+        }
+        
+        .info-box {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 1rem;
+            border-left: 4px solid #007bff;
+        }
+        
+        .danger-box {
+            border-left: 4px solid #dc3545;
+        }
+        
+        .table-pagos th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+        }
+        
+        .cliente-link {
+            color: #0d6efd;
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+        
+        .cliente-link:hover {
+            color: #0a58ca;
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="invoice-header">
+            <div class="container">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h1 class="h3 mb-2"><i class="fas fa-file-invoice me-2"></i>Factura: {{ factura.numero_factura }}</h1>
+                        <p class="mb-0">Detalle completo y gestión de pagos</p>
+                    </div>
+                    <div>
+                        <a href="{{ url_for('dashboard_facturacion') }}" class="btn btn-light">
+                            <i class="fas fa-arrow-left me-2"></i>Volver
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Información Principal -->
+        <div class="card invoice-card">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <h6 class="text-muted">
+                                    <i class="fas fa-user me-1"></i>Cliente
+                                    <a href="{{ url_for('saldo_cliente', cliente_id=factura.cliente.id) }}" 
+                                       class="cliente-link ms-2" title="Ver estado de cuenta del cliente">
+                                        <i class="fas fa-external-link-alt fa-xs"></i>
+                                    </a>
+                                </h6>
+                                <h5>
+                                    <a href="{{ url_for('saldo_cliente', cliente_id=factura.cliente.id) }}" 
+                                       class="cliente-link" title="Ver estado de cuenta completo">
+                                        {{ factura.cliente.nombre }}
+                                    </a>
+                                </h5>
+                                <p class="mb-1 small">
+                                    {{ factura.cliente.tipo_documento }}: {{ factura.cliente.numero_documento }}
+                                </p>
+                                {% if factura.cliente.telefono %}
+                                <p class="mb-1 small">
+                                    <i class="fas fa-phone me-1"></i>{{ factura.cliente.telefono }}
+                                </p>
+                                {% endif %}
+                                {% if factura.cliente.email %}
+                                <p class="mb-0 small">
+                                    <i class="fas fa-envelope me-1"></i>{{ factura.cliente.email }}
+                                </p>
+                                {% endif %}
+                                <div class="mt-2">
+                                    <a href="{{ url_for('saldo_cliente', cliente_id=factura.cliente.id) }}" 
+                                       class="btn btn-sm btn-outline-info">
+                                        <i class="fas fa-chart-pie me-1"></i>Ver Estado de Cuenta
+                                    </a>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <h6 class="text-muted">Servicio</h6>
+                                <h5>{{ factura.servicio.descripcion }}</h5>
+                                {% if factura.descripcion %}
+                                <p class="mb-0 small text-muted">{{ factura.descripcion }}</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="info-box h-100">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h6 class="mb-0">Estado:</h6>
+                                {% set color = obtener_color_estado(factura.estado) %}
+                                <span class="badge bg-{{ color }} badge-estado">{{ factura.estado }}</span>
+                            </div>
+                            
+                            <div class="mb-2">
+                                <small class="text-muted">Fecha Emisión:</small>
+                                <p class="mb-1">{{ factura.fecha_emision.strftime('%d/%m/%Y %H:%M') }}</p>
+                            </div>
+                            
+                            <div class="mb-0">
+                                <small class="text-muted">Fecha Vencimiento:</small>
+                                <p class="mb-0">
+                                    {{ factura.fecha_vencimiento.strftime('%d/%m/%Y') }}
+                                    {% if factura.estado in ['Pendiente', 'Parcial'] and calcular_dias_vencimiento(factura.fecha_vencimiento) <= 7 %}
+                                    <span class="badge bg-warning ms-2">
+                                        Vence en {{ calcular_dias_vencimiento(factura.fecha_vencimiento) }} días
+                                    </span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Resumen Financiero -->
+        <div class="row mb-4">
+            <div class="col-md-3 mb-3">
+                <div class="card invoice-card h-100">
+                    <div class="card-body text-center">
+                        <h6 class="text-muted">Monto Total</h6>
+                        <h3 class="text-primary">{{ formato_moneda(factura.monto_total) }}</h3>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-3 mb-3">
+                <div class="card invoice-card h-100">
+                    <div class="card-body text-center">
+                        <h6 class="text-muted">Pagado</h6>
+                        <h3 class="text-success">{{ formato_moneda(factura.monto_pagado) }}</h3>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-3 mb-3">
+                <div class="card invoice-card h-100">
+                    <div class="card-body text-center">
+                        <h6 class="text-muted">Saldo Pendiente</h6>
+                        <h3 class="text-danger">{{ formato_moneda(factura.saldo_pendiente) }}</h3>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-3 mb-3">
+                <div class="card invoice-card h-100">
+                    <div class="card-body text-center">
+                        <h6 class="text-muted">Porcentaje Pagado</h6>
+                        {% set porcentaje = (factura.monto_pagado / factura.monto_total * 100) if factura.monto_total > 0 else 0 %}
+                        <h3>{{ "%.1f"|format(porcentaje) }}%</h3>
+                        <div class="progreso-pago mt-2">
+                            <div class="progreso-bar" style="width: {{ porcentaje }}%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- Historial de Pagos -->
+            <div class="col-lg-8 mb-4">
+                <div class="card invoice-card">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fas fa-history me-2"></i>Historial de Pagos</h5>
+                        <span class="badge bg-primary">{{ pagos|length }} pagos</span>
+                    </div>
+                    <div class="card-body">
+                        {% if pagos %}
+                        <div class="table-responsive">
+                            <table class="table table-hover table-pagos">
+                                <thead>
+                                    <tr>
+                                        <th>Fecha</th>
+                                        <th>Método</th>
+                                        <th>Referencia</th>
+                                        <th>Monto</th>
+                                        <th>Estado</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for pago in pagos %}
+                                    <tr>
+                                        <td>{{ pago.fecha_pago.strftime('%d/%m/%Y %H:%M') }}</td>
+                                        <td>{{ pago.metodo_pago }}</td>
+                                        <td>
+                                            {% if pago.referencia %}
+                                            <span class="badge bg-secondary">{{ pago.referencia }}</span>
+                                            {% else %}
+                                            <span class="text-muted">N/A</span>
+                                            {% endif %}
+                                        </td>
+                                        <td><strong>{{ formato_moneda(pago.monto) }}</strong></td>
+                                        <td>
+                                            <span class="badge bg-success">{{ pago.estado }}</span>
+                                        </td>
+                                        <td>
+                                            {% if pago.descripcion %}
+                                            <button class="btn btn-sm btn-outline-info btn-action" 
+                                                    title="Ver descripción" 
+                                                    onclick="alert('{{ pago.descripcion }}')">
+                                                <i class="fas fa-info-circle"></i>
+                                            </button>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-money-bill-wave fa-3x text-muted mb-3"></i>
+                            <p class="text-muted">No hay pagos registrados para esta factura</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <!-- Información del Cliente (ampliada) -->
+                <div class="card invoice-card mt-3">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0"><i class="fas fa-user-chart me-2"></i>Información del Cliente</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>Resumen de Cuenta:</h6>
+                                <ul class="list-unstyled">
+                                    <li class="mb-2">
+                                        <i class="fas fa-file-invoice-dollar text-primary me-2"></i>
+                                        <strong>Factura Actual:</strong> 
+                                        {{ formato_moneda(factura.saldo_pendiente) }} pendiente
+                                    </li>
+                                    <li class="mb-2">
+                                        <i class="fas fa-chart-line text-success me-2"></i>
+                                        <a href="{{ url_for('saldo_cliente', cliente_id=factura.cliente.id) }}" class="cliente-link">
+                                            Ver saldo total del cliente
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <i class="fas fa-history text-info me-2"></i>
+                                        <a href="{{ url_for('buscar_facturas') }}?cliente_id={{ factura.cliente.id }}" class="cliente-link">
+                                            Ver todas las facturas de {{ factura.cliente.nombre.split(' ')[0] }}
+                                        </a>
+                                    </li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6 text-end">
+                                <a href="{{ url_for('saldo_cliente', cliente_id=factura.cliente.id) }}" 
+                                   class="btn btn-info">
+                                    <i class="fas fa-chart-pie me-2"></i>Estado de Cuenta Completo
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Acciones -->
+            <div class="col-lg-4 mb-4">
+                <!-- Registrar Pago -->
+                <div class="card invoice-card mb-4">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0"><i class="fas fa-plus-circle me-2"></i>Registrar Pago</h5>
+                    </div>
+                    <div class="card-body">
+                        {% if factura.estado != 'Anulada' and factura.saldo_pendiente > 0 %}
+                        <form method="POST" action="{{ url_for('registrar_pago_factura', factura_id=factura.id) }}">
+                            <div class="mb-3">
+                                <label class="form-label">Monto a Pagar</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control" name="monto" 
+                                           step="0.01" min="0.01" max="{{ factura.saldo_pendiente }}"
+                                           value="{{ factura.saldo_pendiente }}" required>
+                                    <span class="input-group-text">
+                                        Máx: {{ formato_moneda(factura.saldo_pendiente) }}
+                                    </span>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Método de Pago</label>
+                                <select class="form-select" name="metodo_pago" required>
+                                    <option value="Efectivo">Efectivo</option>
+                                    <option value="Tarjeta Débito">Tarjeta Débito</option>
+                                    <option value="Tarjeta Crédito">Tarjeta Crédito</option>
+                                    <option value="Transferencia">Transferencia Bancaria</option>
+                                    <option value="Cheque">Cheque</option>
+                                    <option value="Depósito">Depósito</option>
+                                </select>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Referencia/Número</label>
+                                <input type="text" class="form-control" name="referencia" 
+                                       placeholder="Ej: TRANS001, CHEQUE123">
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Descripción (opcional)</label>
+                                <textarea class="form-control" name="descripcion" rows="2"></textarea>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-success w-100">
+                                <i class="fas fa-check-circle me-2"></i>Registrar Pago
+                            </button>
+                        </form>
+                        {% elif factura.estado == 'Anulada' %}
+                        <div class="alert alert-danger">
+                            <i class="fas fa-ban me-2"></i>Esta factura está anulada y no acepta pagos.
+                        </div>
+                        {% else %}
+                        <div class="alert alert-success">
+                            <i class="fas fa-check-circle me-2"></i>Esta factura está completamente pagada.
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Otras Acciones -->
+                <div class="card invoice-card">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0"><i class="fas fa-cog me-2"></i>Acciones</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-grid gap-2">
+                            <a href="{{ url_for('reimprimir_factura', factura_id=factura.id) }}" 
+                               class="btn btn-outline-primary" target="_blank">
+                                <i class="fas fa-print me-2"></i>Imprimir Factura
+                            </a>
+                            
+                            <a href="{{ url_for('buscar_facturas') }}?q={{ factura.numero_factura }}" 
+                               class="btn btn-outline-secondary">
+                                <i class="fas fa-search me-2"></i>Buscar Similar
+                            </a>
+                            
+                            <a href="{{ url_for('saldo_cliente', cliente_id=factura.cliente.id) }}" 
+                               class="btn btn-outline-info">
+                                <i class="fas fa-user me-2"></i>Estado de Cuenta del Cliente
+                            </a>
+                            
+                            {% if current_user.rol.nombre in ['ADMIN', 'GERENTE'] %}
+                            <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" 
+                                    data-bs-target="#modalAnular" {% if factura.estado == 'Anulada' or factura.monto_pagado > 0 %}disabled{% endif %}>
+                                <i class="fas fa-times-circle me-2"></i>Anular Factura
+                            </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Información Rápida -->
+                <div class="card invoice-card mt-3">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Información Rápida</h5>
+                    </div>
+                    <div class="card-body">
+                        <ul class="list-unstyled mb-0">
+                            <li class="mb-2">
+                                <i class="fas fa-user-friends me-2 text-primary"></i>
+                                <strong>Cliente:</strong> {{ factura.cliente.nombre }}
+                            </li>
+                            <li class="mb-2">
+                                <i class="fas fa-calendar-alt me-2 text-warning"></i>
+                                <strong>Vence:</strong> {{ factura.fecha_vencimiento.strftime('%d/%m/%Y') }}
+                            </li>
+                            <li class="mb-2">
+                                <i class="fas fa-dollar-sign me-2 text-danger"></i>
+                                <strong>Pendiente:</strong> {{ formato_moneda(factura.saldo_pendiente) }}
+                            </li>
+                            <li>
+                                <i class="fas fa-percentage me-2 text-success"></i>
+                                <strong>Pagado:</strong> {{ "%.1f"|format((factura.monto_pagado / factura.monto_total * 100) if factura.monto_total > 0 else 0) }}%
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Anular Factura -->
+    {% if current_user.rol.nombre in ['ADMIN', 'GERENTE'] %}
+    <div class="modal fade" id="modalAnular" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title"><i class="fas fa-exclamation-triangle me-2"></i>Confirmar Anulación</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" action="{{ url_for('anular_factura', factura_id=factura.id) }}">
+                    <div class="modal-body">
+                        <div class="alert alert-warning">
+                            <strong>¡Advertencia!</strong> Esta acción no se puede deshacer.
+                        </div>
+                        
+                        <p>¿Está seguro de anular la factura <strong>{{ factura.numero_factura }}</strong>?</p>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Motivo de la anulación</label>
+                            <textarea class="form-control" name="motivo" rows="3" required 
+                                      placeholder="Especifique el motivo de la anulación..."></textarea>
+                        </div>
+                        
+                        <div class="info-box danger-box">
+                            <h6>Información de la Factura:</h6>
+                            <ul class="mb-0">
+                                <li>Cliente: {{ factura.cliente.nombre }}</li>
+                                <li>Monto Total: {{ formato_moneda(factura.monto_total) }}</li>
+                                <li>Pagado: {{ formato_moneda(factura.monto_pagado) }}</li>
+                                <li>Saldo: {{ formato_moneda(factura.saldo_pendiente) }}</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-danger">Confirmar Anulación</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Validación de monto máximo
+        document.querySelector('input[name="monto"]').addEventListener('input', function() {
+            const max = parseFloat('{{ factura.saldo_pendiente }}');
+            const value = parseFloat(this.value);
+            
+            if (value > max) {
+                this.value = max;
+                alert(`El monto no puede exceder el saldo pendiente: ${max.toFixed(2)}`);
+            }
+        });
+        
+        // Auto-seleccionar campo de monto
+        document.addEventListener('DOMContentLoaded', function() {
+            const montoInput = document.querySelector('input[name="monto"]');
+            if (montoInput) {
+                montoInput.focus();
+                montoInput.select();
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Análisis de Tendencias - UNAPEC</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <nav class="col-md-3 col-lg-2 d-md-block bg-light sidebar">
+                <div class="position-sticky pt-3">
+                    <ul class="nav flex-column">
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('dashboard_financiero') }}">
+                                <i class="fas fa-chart-line"></i>
+                                Dashboard Financiero
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('presupuestos') }}">
+                                <i class="fas fa-money-bill-wave"></i>
+                                Presupuestos
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link active" href="{{ url_for('analisis_tendencias') }}">
+                                <i class="fas fa-chart-bar"></i>
+                                Análisis de Tendencias
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+
+            <!-- Main content -->
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                    <h1 class="h2">Análisis de Tendencias Financieras</h1>
+                    <a href="{{ url_for('reporte_financiero_completo') }}" class="btn btn-primary">
+                        <i class="fas fa-download"></i> Exportar Reporte
+                    </a>
+                </div>
+
+                <!-- Resumen de Tendencias -->
+                <div class="row mb-4">
+                    <div class="col-md-4">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <h3>{{ tendencias|length }}</h3>
+                                <p class="text-muted">Servicios Analizados</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <h3>{{ tendencias|selectattr('tendencia', 'gt', 0)|list|length }}</h3>
+                                <p class="text-muted">Tendencias Positivas</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <h3>{{ tendencias|selectattr('tendencia', 'lt', 0)|list|length }}</h3>
+                                <p class="text-muted">Tendencias Negativas</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Gráfico de Tendencias -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5>Gráfico de Tendencias por Servicio</h5>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="tendenciasChart" height="100"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabla Detallada -->
+                <div class="row">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5>Análisis Detallado por Servicio</h5>
+                            </div>
+                            <div class="card-body">
+                                {% if tendencias %}
+                                <div class="table-responsive">
+                                    <table class="table table-striped">
+                                        <thead>
+                                            <tr>
+                                                <th>Servicio</th>
+                                                <th>Tendencia Diaria</th>
+                                                <th>Total Ingresos</th>
+                                                <th>Movimientos</th>
+                                                <th>Estado</th>
+                                                <th>Recomendación</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for tendencia in tendencias %}
+                                            <tr>
+                                                <td>{{ tendencia.servicio }}</td>
+                                                <td>
+                                                    <span class="badge {% if tendencia.tendencia > 0 %}bg-success{% else %}bg-danger{% endif %}">
+                                                        ${{ "%.2f"|format(tendencia.tendencia) }}/día
+                                                    </span>
+                                                </td>
+                                                <td>${{ "%.2f"|format(tendencia.total_ingresos) }}</td>
+                                                <td>{{ tendencia.cantidad_movimientos }}</td>
+                                                <td>
+                                                    {% if tendencia.tendencia > 10 %}
+                                                    <span class="badge bg-success">Crecimiento Alto</span>
+                                                    {% elif tendencia.tendencia > 0 %}
+                                                    <span class="badge bg-info">Crecimiento Moderado</span>
+                                                    {% elif tendencia.tendencia > -5 %}
+                                                    <span class="badge bg-warning">Estable</span>
+                                                    {% else %}
+                                                    <span class="badge bg-danger">Decrecimiento</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    {% if tendencia.tendencia > 10 %}
+                                                    <small class="text-success">Mantener estrategia actual</small>
+                                                    {% elif tendencia.tendencia > 0 %}
+                                                    <small class="text-info">Potencial de crecimiento</small>
+                                                    {% elif tendencia.tendencia > -5 %}
+                                                    <small class="text-warning">Revisar estrategia</small>
+                                                    {% else %}
+                                                    <small class="text-danger">Acción correctiva necesaria</small>
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {% else %}
+                                <div class="text-center py-4">
+                                    <i class="fas fa-chart-bar fa-3x text-muted mb-3"></i>
+                                    <p class="text-muted">No hay datos suficientes para el análisis de tendencias.</p>
+                                    <p class="text-muted">Se requieren al menos 2 movimientos por servicio.</p>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script>
+        // Gráfico de tendencias
+        const ctx = document.getElementById('tendenciasChart').getContext('2d');
+        const tendenciasChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: {{ servicios|tojson }},
+                datasets: [{
+                    label: 'Tendencia Diaria ($)',
+                    data: {{ tendencia_valores|tojson }},
+                    backgroundColor: [
+                        'rgba(75, 192, 192, 0.6)',
+                        'rgba(54, 162, 235, 0.6)',
+                        'rgba(255, 206, 86, 0.6)',
+                        'rgba(255, 99, 132, 0.6)',
+                        'rgba(153, 102, 255, 0.6)'
+                    ],
+                    borderColor: [
+                        'rgba(75, 192, 192, 1)',
+                        'rgba(54, 162, 235, 1)',
+                        'rgba(255, 206, 86, 1)',
+                        'rgba(255, 99, 132, 1)',
+                        'rgba(153, 102, 255, 1)'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    },
+                    title: {
+                        display: true,
+                        text: 'Tendencias de Crecimiento por Servicio'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Tendencia ($ por día)'
+                        }
+                    }
+                }
+            }
+        });
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

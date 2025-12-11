@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Gerencial - Facturación</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .gerencial-header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+            border-radius: 0 0 20px 20px;
+        }
+        
+        .metric-card {
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            text-align: center;
+            transition: transform 0.3s;
+        }
+        
+        .metric-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .metric-card.facturado { background: linear-gradient(135deg, #3498db, #2980b9); color: white; }
+        .metric-card.cobrado { background: linear-gradient(135deg, #27ae60, #219653); color: white; }
+        .metric-card.pendiente { background: linear-gradient(135deg, #f39c12, #e67e22); color: white; }
+        .metric-card.porcentaje { background: linear-gradient(135deg, #9b59b6, #8e44ad); color: white; }
+        
+        .metric-icon {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .chart-container {
+            background: white;
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .table-gerencial th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+        }
+        
+        .progress-thin {
+            height: 6px;
+            border-radius: 3px;
+        }
+        
+        .badge-small {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+        }
+        
+        .evolution-item {
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .evolution-item:last-child {
+            border-bottom: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <!-- Header -->
+        <div class="gerencial-header">
+            <div class="container">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h1 class="h3 mb-2"><i class="fas fa-chart-line me-2"></i>Dashboard Gerencial</h1>
+                        <p class="mb-0">Métricas y análisis de facturación</p>
+                    </div>
+                    <div>
+                        <a href="{{ url_for('dashboard_facturacion') }}" class="btn btn-light">
+                            <i class="fas fa-arrow-left me-2"></i>Volver
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="container">
+            <!-- Métricas Principales -->
+            <div class="row mb-4">
+                <div class="col-md-3 col-6">
+                    <div class="metric-card facturado">
+                        <div class="metric-icon"><i class="fas fa-file-invoice-dollar"></i></div>
+                        <h3>{{ formato_moneda(total_facturado_mes) }}</h3>
+                        <p class="mb-0">Total Facturado</p>
+                    </div>
+                </div>
+                <div class="col-md-3 col-6">
+                    <div class="metric-card cobrado">
+                        <div class="metric-icon"><i class="fas fa-money-bill-wave"></i></div>
+                        <h3>{{ formato_moneda(total_cobrado_mes) }}</h3>
+                        <p class="mb-0">Total Cobrado</p>
+                    </div>
+                </div>
+                <div class="col-md-3 col-6">
+                    <div class="metric-card pendiente">
+                        <div class="metric-icon"><i class="fas fa-clock"></i></div>
+                        <h3>{{ formato_moneda(total_pendiente_mes) }}</h3>
+                        <p class="mb-0">Total Pendiente</p>
+                    </div>
+                </div>
+                <div class="col-md-3 col-6">
+                    <div class="metric-card porcentaje">
+                        <div class="metric-icon"><i class="fas fa-percentage"></i></div>
+                        <h3>{{ "%.1f"|format(porcentaje_cobranza) }}%</h3>
+                        <p class="mb-0">% Cobranza</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <!-- Facturas por Estado -->
+                <div class="col-lg-6 mb-4">
+                    <div class="chart-container">
+                        <h5 class="mb-3"><i class="fas fa-chart-pie me-2"></i>Facturas por Estado</h5>
+                        {% if facturas_por_estado %}
+                        <div class="table-responsive">
+                            <table class="table table-sm table-gerencial">
+                                <thead>
+                                    <tr>
+                                        <th>Estado</th>
+                                        <th>Cantidad</th>
+                                        <th>Monto Pendiente</th>
+                                        <th>% del Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for estado_data in facturas_por_estado %}
+                                    <tr>
+                                        <td>
+                                            {% set color = obtener_color_estado(estado_data.estado) %}
+                                            <span class="badge bg-{{ color }} badge-small">{{ estado_data.estado }}</span>
+                                        </td>
+                                        <td>{{ estado_data.cantidad }}</td>
+                                        <td>{{ formato_moneda(estado_data.monto_pendiente) }}</td>
+                                        <td>
+                                            {% set porcentaje = (estado_data.cantidad / facturas_por_estado|sum(attribute='cantidad') * 100) if facturas_por_estado|sum(attribute='cantidad') > 0 else 0 %}
+                                            <div class="d-flex align-items-center">
+                                                <div class="progress-thin flex-grow-1 me-2">
+                                                    <div class="progress-bar bg-{{ color }}" style="width: {{ porcentaje }}%"></div>
+                                                </div>
+                                                <span>{{ "%.1f"|format(porcentaje) }}%</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-chart-pie fa-3x text-muted mb-3"></i>
+                            <p class="text-muted">No hay datos de facturas por estado</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Top Servicios -->
+                <div class="col-lg-6 mb-4">
+                    <div class="chart-container">
+                        <h5 class="mb-3"><i class="fas fa-star me-2"></i>Top 5 Servicios Más Facturados</h5>
+                        {% if top_servicios %}
+                        <div class="table-responsive">
+                            <table class="table table-sm table-gerencial">
+                                <thead>
+                                    <tr>
+                                        <th>Servicio</th>
+                                        <th>Cantidad</th>
+                                        <th>Total Facturado</th>
+                                        <th>Ranking</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for servicio in top_servicios %}
+                                    <tr>
+                                        <td>{{ servicio.descripcion[:30] }}{% if servicio.descripcion|length > 30 %}...{% endif %}</td>
+                                        <td>{{ servicio.cantidad_facturas }}</td>
+                                        <td><strong>{{ formato_moneda(servicio.total_facturado) }}</strong></td>
+                                        <td>
+                                            {% if loop.index == 1 %}
+                                                <span class="badge bg-warning">🥇 1°</span>
+                                            {% elif loop.index == 2 %}
+                                                <span class="badge bg-secondary">🥈 2°</span>
+                                            {% elif loop.index == 3 %}
+                                                <span class="badge bg-danger">🥉 3°</span>
+                                            {% else %}
+                                                <span class="badge bg-light text-dark">{{ loop.index }}°</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-star fa-3x text-muted mb-3"></i>
+                            <p class="text-muted">No hay datos de servicios facturados</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Evolución Mensual -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="chart-container">
+                        <h5 class="mb-3"><i class="fas fa-chart-line me-2"></i>Evolución Últimos 6 Meses</h5>
+                        {% if meses_data %}
+                        <div class="table-responsive">
+                            <table class="table table-sm table-gerencial">
+                                <thead>
+                                    <tr>
+                                        <th>Período</th>
+                                        <th>Facturado</th>
+                                        <th>Cobrado</th>
+                                        <th>Pendiente</th>
+                                        <th>% Cobranza</th>
+                                        <th>Tendencia</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for mes in meses_data %}
+                                    <tr>
+                                        <td>{{ mes.mes }}/{{ mes.año }}</td>
+                                        <td>{{ formato_moneda(mes.facturado) }}</td>
+                                        <td>{{ formato_moneda(mes.cobrado) }}</td>
+                                        <td>{{ formato_moneda(mes.pendiente) }}</td>
+                                        <td>
+                                            {% set porcentaje_mes = (mes.cobrado / mes.facturado * 100) if mes.facturado > 0 else 0 %}
+                                            <span class="{% if porcentaje_mes >= 80 %}text-success{% elif porcentaje_mes >= 50 %}text-warning{% else %}text-danger{% endif %}">
+                                                {{ "%.1f"|format(porcentaje_mes) }}%
+                                            </span>
+                                        </td>
+                                        <td>
+                                            {% if loop.index > 1 %}
+                                                {% set mes_anterior = meses_data[loop.index0 - 1] %}
+                                                {% set variacion = ((mes.cobrado - mes_anterior.cobrado) / mes_anterior.cobrado * 100) if mes_anterior.cobrado > 0 else 100 %}
+                                                {% if variacion > 0 %}
+                                                    <span class="badge bg-success badge-small">
+                                                        <i class="fas fa-arrow-up"></i> {{ "%.1f"|format(variacion) }}%
+                                                    </span>
+                                                {% elif variacion < 0 %}
+                                                    <span class="badge bg-danger badge-small">
+                                                        <i class="fas fa-arrow-down"></i> {{ "%.1f"|format(-variacion) }}%
+                                                    </span>
+                                                {% else %}
+                                                    <span class="badge bg-secondary badge-small">=</span>
+                                                {% endif %}
+                                            {% else %}
+                                                <span class="badge bg-light text-dark badge-small">-</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <!-- Gráfico simplificado -->
+                        <div class="mt-4">
+                            <h6 class="mb-3">Comparativa Facturado vs Cobrado:</h6>
+                            {% for mes in meses_data[-3:] %}
+                            <div class="evolution-item">
+                                <div class="d-flex justify-content-between mb-1">
+                                    <small>{{ mes.mes }}/{{ mes.año }}</small>
+                                    <small>{{ formato_moneda(mes.facturado) }} facturado</small>
+                                </div>
+                                <div class="progress" style="height: 10px;">
+                                    {% set porcentaje_cobrado = (mes.cobrado / mes.facturado * 100) if mes.facturado > 0 else 0 %}
+                                    <div class="progress-bar bg-success" style="width: {{ porcentaje_cobrado }}%" 
+                                         title="Cobrado: {{ formato_moneda(mes.cobrado) }}"></div>
+                                    <div class="progress-bar bg-warning" style="width: {{ 100 - porcentaje_cobrado }}%"
+                                         title="Pendiente: {{ formato_moneda(mes.pendiente) }}"></div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-chart-line fa-3x text-muted mb-3"></i>
+                            <p class="text-muted">No hay datos de evolución mensual</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Insights -->
+            <div class="row mt-4">
+                <div class="col-md-6">
+                    <div class="chart-container">
+                        <h5 class="mb-3"><i class="fas fa-lightbulb me-2"></i>Insights</h5>
+                        <div class="alert alert-info">
+                            <h6><i class="fas fa-chart-line me-2"></i>Tendencia:</h6>
+                            <p class="mb-2">
+                                {% if total_cobrado_mes > total_facturado_mes|float * 0.8 %}
+                                    <span class="text-success">✅ Excelente nivel de cobranza este mes</span>
+                                {% elif total_cobrado_mes > total_facturado_mes|float * 0.5 %}
+                                    <span class="text-warning">⚠️ Cobranza en nivel aceptable</span>
+                                {% else %}
+                                    <span class="text-danger">❌ Cobranza por debajo de lo esperado</span>
+                                {% endif %}
+                            </p>
+                            <p class="mb-0 small">
+                                Meta recomendada: {{ formato_moneda(total_facturado_mes * 0.8) }} (80% del facturado)
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="chart-container">
+                        <h5 class="mb-3"><i class="fas fa-bullseye me-2"></i>Acciones Recomendadas</h5>
+                        <ul class="list-group list-group-flush">
+                            <li class="list-group-item">
+                                <i class="fas fa-phone text-primary me-2"></i>
+                                Contactar clientes con facturas vencidas
+                            </li>
+                            <li class="list-group-item">
+                                <i class="fas fa-bell text-warning me-2"></i>
+                                Enviar recordatorios a facturas por vencer
+                            </li>
+                            <li class="list-group-item">
+                                <i class="fas fa-chart-pie text-success me-2"></i>
+                                Analizar servicios con mejor rendimiento
+                            </li>
+                            <li class="list-group-item">
+                                <i class="fas fa-file-export text-info me-2"></i>
+                                Generar reporte ejecutivo mensual
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

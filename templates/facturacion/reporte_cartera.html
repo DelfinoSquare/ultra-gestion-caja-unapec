@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reporte de Cartera - Sistema UNAPEC</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .report-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+            border-radius: 0 0 20px 20px;
+        }
+        
+        .summary-card {
+            border-radius: 10px;
+            padding: 1.5rem;
+            color: white;
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+        
+        .summary-card.vencido {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+        }
+        
+        .summary-card.por-vencer {
+            background: linear-gradient(135deg, #f39c12, #e67e22);
+        }
+        
+        .factura-card {
+            border-left: 4px solid;
+            transition: all 0.3s;
+            margin-bottom: 1rem;
+        }
+        
+        .factura-card.vencida {
+            border-left-color: #e74c3c;
+        }
+        
+        .factura-card.por-vencer {
+            border-left-color: #f39c12;
+        }
+        
+        .badge-dias {
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-weight: 500;
+        }
+        
+        .table-cartera th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+        }
+        
+        .alert-section {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 1rem;
+            border-radius: 5px;
+            margin-bottom: 1.5rem;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <!-- Header -->
+        <div class="report-header">
+            <div class="container">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h1 class="h3 mb-2"><i class="fas fa-chart-bar me-2"></i>Reporte de Cartera</h1>
+                        <p class="mb-0">Análisis de facturas vencidas y por vencer</p>
+                    </div>
+                    <div>
+                        <a href="{{ url_for('dashboard_facturacion') }}" class="btn btn-light">
+                            <i class="fas fa-arrow-left me-2"></i>Volver
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="container">
+            <!-- Resumen -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="summary-card vencido">
+                        <div class="d-flex align-items-center justify-content-center">
+                            <i class="fas fa-exclamation-triangle fa-3x me-3"></i>
+                            <div>
+                                <h3 class="mb-1">{{ formato_moneda(total_vencido) }}</h3>
+                                <p class="mb-0">Total Vencido<br>{{ facturas_vencidas|length }} factura(s)</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="summary-card por-vencer">
+                        <div class="d-flex align-items-center justify-content-center">
+                            <i class="fas fa-clock fa-3x me-3"></i>
+                            <div>
+                                <h3 class="mb-1">{{ formato_moneda(total_por_vencer) }}</h3>
+                                <p class="mb-0">Por Vencer (7 días)<br>{{ facturas_por_vencer|length }} factura(s)</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Facturas Vencidas -->
+            <div class="alert-section">
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-exclamation-circle fa-2x me-3 text-danger"></i>
+                    <div>
+                        <h5 class="mb-1 text-danger">Facturas Vencidas</h5>
+                        <p class="mb-0">Facturas con fecha de vencimiento anterior a {{ hoy.strftime('%d/%m/%Y') }}</p>
+                    </div>
+                </div>
+            </div>
+
+            {% if facturas_vencidas %}
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover table-cartera">
+                            <thead>
+                                <tr>
+                                    <th>N° Factura</th>
+                                    <th>Cliente</th>
+                                    <th>Fecha Vencimiento</th>
+                                    <th>Días Vencida</th>
+                                    <th>Monto Total</th>
+                                    <th>Saldo Pendiente</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for factura in facturas_vencidas %}
+                                <tr class="align-middle">
+                                    <td>
+                                        <strong>{{ factura.numero_factura }}</strong>
+                                    </td>
+                                    <td>{{ factura.cliente.nombre[:25] }}{% if factura.cliente.nombre|length > 25 %}...{% endif %}</td>
+                                    <td>
+                                        {{ factura.fecha_vencimiento.strftime('%d/%m/%Y') }}
+                                    </td>
+                                    <td>
+                                        {% set dias_vencida = calcular_dias_vencimiento(factura.fecha_vencimiento) %}
+                                        <span class="badge bg-danger badge-dias">
+                                            {{ -dias_vencida if dias_vencida < 0 else 0 }} días
+                                        </span>
+                                    </td>
+                                    <td><strong>{{ formato_moneda(factura.monto_total) }}</strong></td>
+                                    <td class="text-danger"><strong>{{ formato_moneda(factura.saldo_pendiente) }}</strong></td>
+                                    <td>
+                                        <a href="{{ url_for('detalle_factura', factura_id=factura.id) }}" 
+                                           class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-eye"></i> Ver
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="empty-state mb-4">
+                <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+                <h4 class="text-success">¡Excelente!</h4>
+                <p class="text-muted">No hay facturas vencidas en este momento</p>
+            </div>
+            {% endif %}
+
+            <!-- Facturas por Vencer -->
+            <div class="alert-section" style="background: #e7f3ff; border-left-color: #0d6efd;">
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-clock fa-2x me-3 text-primary"></i>
+                    <div>
+                        <h5 class="mb-1 text-primary">Facturas por Vencer</h5>
+                        <p class="mb-0">Facturas que vencen entre {{ hoy.strftime('%d/%m/%Y') }} y {{ limite_7_dias.strftime('%d/%m/%Y') }}</p>
+                    </div>
+                </div>
+            </div>
+
+            {% if facturas_por_vencer %}
+            <div class="card">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover table-cartera">
+                            <thead>
+                                <tr>
+                                    <th>N° Factura</th>
+                                    <th>Cliente</th>
+                                    <th>Fecha Vencimiento</th>
+                                    <th>Días Restantes</th>
+                                    <th>Monto Total</th>
+                                    <th>Saldo Pendiente</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for factura in facturas_por_vencer %}
+                                <tr class="align-middle">
+                                    <td>
+                                        <strong>{{ factura.numero_factura }}</strong>
+                                    </td>
+                                    <td>{{ factura.cliente.nombre[:25] }}{% if factura.cliente.nombre|length > 25 %}...{% endif %}</td>
+                                    <td>{{ factura.fecha_vencimiento.strftime('%d/%m/%Y') }}</td>
+                                    <td>
+                                        {% set dias_restantes = calcular_dias_vencimiento(factura.fecha_vencimiento) %}
+                                        {% if dias_restantes <= 3 %}
+                                            {% set color = 'danger' %}
+                                        {% elif dias_restantes <= 7 %}
+                                            {% set color = 'warning' %}
+                                        {% else %}
+                                            {% set color = 'success' %}
+                                        {% endif %}
+                                        <span class="badge bg-{{ color }} badge-dias">
+                                            {{ dias_restantes }} días
+                                        </span>
+                                    </td>
+                                    <td><strong>{{ formato_moneda(factura.monto_total) }}</strong></td>
+                                    <td class="text-warning"><strong>{{ formato_moneda(factura.saldo_pendiente) }}</strong></td>
+                                    <td>
+                                        <a href="{{ url_for('detalle_factura', factura_id=factura.id) }}" 
+                                           class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-eye"></i> Ver
+                                        </a>
+                                        <a href="{{ url_for('registrar_pago_factura', factura_id=factura.id) }}" 
+                                           class="btn btn-sm btn-outline-success">
+                                            <i class="fas fa-money-bill-wave"></i> Pagar
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <i class="fas fa-calendar-check fa-3x text-primary mb-3"></i>
+                <h4 class="text-primary">Sin facturas próximas a vencer</h4>
+                <p class="text-muted">No hay facturas que venzan en los próximos 7 días</p>
+            </div>
+            {% endif %}
+
+            <!-- Recomendaciones -->
+            <div class="card mt-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="fas fa-lightbulb me-2"></i>Recomendaciones</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="alert alert-info">
+                                <h6><i class="fas fa-phone me-2"></i>Acciones Recomendadas:</h6>
+                                <ul class="mb-0">
+                                    <li>Contactar clientes con facturas vencidas</li>
+                                    <li>Enviar recordatorios a facturas por vencer</li>
+                                    <li>Ofrecer opciones de pago diferido</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="alert alert-warning">
+                                <h6><i class="fas fa-chart-line me-2"></i>Métricas:</h6>
+                                <ul class="mb-0">
+                                    <li>Monto total vencido: {{ formato_moneda(total_vencido) }}</li>
+                                    <li>Monto por vencer: {{ formato_moneda(total_por_vencer) }}</li>
+                                    <li>Total riesgo: {{ formato_moneda(total_vencido + total_por_vencer) }}</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

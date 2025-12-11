@@ -5,11 +5,17 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 from functools import wraps
 
+import numpy as np
+import pandas as pd
+from datetime import datetime, date, timedelta
+from decimal import Decimal
+
 import io
 import matplotlib
 matplotlib.use('Agg')  # Para usar matplotlib sin interfaz gráfica
 import matplotlib.pyplot as plt
 from fpdf import FPDF
+import random
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'unapec-caja-secret-key'
@@ -32,6 +38,64 @@ ROLES = {
     'CONSULTA': 'Consulta',
     'GERENTE': 'Gerente'
 }
+
+# =============================================
+# FUNCIONES AUXILIARES
+# =============================================
+
+def generar_numero_factura():
+    """Genera un número de factura único"""
+    from datetime import datetime
+    año = datetime.now().year
+    mes = datetime.now().strftime('%m')
+    
+    # Buscar última factura del mes
+    ultima_factura = Factura.query.filter(
+        Factura.numero_factura.like(f'FAC-{año}{mes}-%')
+    ).order_by(Factura.numero_factura.desc()).first()
+    
+    if ultima_factura:
+        try:
+            ultimo_numero = int(ultima_factura.numero_factura.split('-')[-1])
+            nuevo_numero = ultimo_numero + 1
+        except:
+            nuevo_numero = 1
+    else:
+        nuevo_numero = 1
+    
+    return f'FAC-{año}{mes}-{nuevo_numero:04d}'
+
+def actualizar_estado_factura(factura_id):
+    """Actualiza el estado de una factura basado en pagos"""
+    factura = Factura.query.get_or_404(factura_id)
+    
+    # Calcular monto total pagado
+    total_pagado = db.session.query(db.func.sum(Pago.monto)).filter(
+        Pago.factura_id == factura_id,
+        Pago.estado == 'Aplicado'
+    ).scalar() or 0
+    
+    factura.monto_pagado = total_pagado
+    factura.saldo_pendiente = factura.monto_total - total_pagado
+    
+    # Actualizar estado basado en saldo
+    if factura.saldo_pendiente <= 0:
+        factura.estado = 'Pagada'
+    elif factura.monto_pagado > 0:
+        factura.estado = 'Parcial'
+    else:
+        factura.estado = 'Pendiente'
+    
+    # Verificar vencimiento
+    if factura.fecha_vencimiento and factura.fecha_vencimiento < datetime.now() and factura.saldo_pendiente > 0:
+        factura.estado = 'Vencida'
+    
+    db.session.commit()
+    return factura
+
+# =============================================
+# MODELOS DE LA BASE DE DATOS
+# =============================================
 
 # Clase PDF personalizada
 class PDFReport(FPDF):
@@ -78,6 +142,45 @@ class Usuario(UserMixin, db.Model):
     estado = db.Column(db.String(20), default='Activo')
     fecha_creacion = db.Column(db.DateTime, default=datetime.now)
     ultimo_acceso = db.Column(db.DateTime)
+
+# Modelos Financieros (NUEVOS)
+class CierreDiario(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    fecha = db.Column(db.Date, nullable=False, default=date.today)
+    total_ingresos = db.Column(db.Float, nullable=False, default=0)
+    total_egresos = db.Column(db.Float, nullable=False, default=0)
+    saldo_final = db.Column(db.Float, nullable=False, default=0)
+    estado = db.Column(db.String(20), default='Abierto')
+    created_at = db.Column(db.DateTime, default=datetime.now)
+
+class Presupuesto(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    año = db.Column(db.Integer, nullable=False)
+    mes = db.Column(db.Integer, nullable=False)
+    servicio_id = db.Column(db.Integer, db.ForeignKey('servicio.id'), nullable=False)
+    monto_presupuestado = db.Column(db.Float, nullable=False)
+    monto_ejecutado = db.Column(db.Float, default=0)
+    desviacion = db.Column(db.Float, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    
+    servicio = db.relationship('Servicio', backref='presupuestos')
+
+class FlujoCaja(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    fecha = db.Column(db.Date, nullable=False, default=date.today)
+    tipo = db.Column(db.String(20), nullable=False)  # 'Ingreso' o 'Egreso'
+    categoria = db.Column(db.String(100), nullable=False)
+    descripcion = db.Column(db.Text)
+    monto = db.Column(db.Float, nullable=False)
+    saldo_acumulado = db.Column(db.Float, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+
+class IndicadorFinanciero(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    nombre = db.Column(db.String(100), nullable=False)
+    valor = db.Column(db.Float, nullable=False)
+    fecha_calculo = db.Column(db.DateTime, default=datetime.now)
+    tipo = db.Column(db.String(50))  # 'Liquidez', 'Rentabilidad', 'Eficiencia'
 
 # Modelos de Negocio (Actualizados)
 class TipoDocumento(db.Model):
@@ -153,11 +256,133 @@ class MovimientoCaja(db.Model):
     descripcion = db.Column(db.Text)
     estado = db.Column(db.String(20), default='Activo')
 
+# =============================================
+# MODELOS DE FACTURACIÓN
+# =============================================
+
+class Factura(db.Model):
+    """Facturas emitidas a clientes por servicios"""
+    id = db.Column(db.Integer, primary_key=True)
+    cliente_id = db.Column(db.Integer, db.ForeignKey('cliente.id'), nullable=False)
+    servicio_id = db.Column(db.Integer, db.ForeignKey('servicio.id'), nullable=False)
+    numero_factura = db.Column(db.String(50), unique=True, nullable=False)
+    fecha_emision = db.Column(db.DateTime, default=datetime.now)
+    fecha_vencimiento = db.Column(db.DateTime)
+    monto_total = db.Column(db.Float, nullable=False)
+    monto_pagado = db.Column(db.Float, default=0)
+    saldo_pendiente = db.Column(db.Float, default=0)
+    estado = db.Column(db.String(20), default='Pendiente')  # Pendiente, Pagada, Vencida, Parcial, Anulada
+    descripcion = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    
+    cliente = db.relationship('Cliente', backref='facturas')
+    servicio = db.relationship('Servicio', backref='facturas')
+    pagos = db.relationship('Pago', backref='factura', cascade='all, delete-orphan')
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if self.saldo_pendiente == 0:
+            self.saldo_pendiente = self.monto_total
+        if not self.fecha_vencimiento:
+            self.fecha_vencimiento = datetime.now() + timedelta(days=30)
+
+class Pago(db.Model):
+    """Pagos realizados por los clientes"""
+    id = db.Column(db.Integer, primary_key=True)
+    factura_id = db.Column(db.Integer, db.ForeignKey('factura.id'), nullable=False)
+    movimiento_id = db.Column(db.Integer, db.ForeignKey('movimiento_caja.id'), nullable=True)
+    monto = db.Column(db.Float, nullable=False)
+    fecha_pago = db.Column(db.DateTime, default=datetime.now)
+    metodo_pago = db.Column(db.String(50))
+    referencia = db.Column(db.String(100))
+    descripcion = db.Column(db.Text)
+    estado = db.Column(db.String(20), default='Aplicado')  # Aplicado, Anulado
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    
+    movimiento = db.relationship('MovimientoCaja', backref='pago_relacionado')
+
+class ServicioCliente(db.Model):
+    """Servicios contratados por clientes (para histórico)"""
+    id = db.Column(db.Integer, primary_key=True)
+    cliente_id = db.Column(db.Integer, db.ForeignKey('cliente.id'), nullable=False)
+    servicio_id = db.Column(db.Integer, db.ForeignKey('servicio.id'), nullable=False)
+    fecha_contratacion = db.Column(db.DateTime, default=datetime.now)
+    monto_contratado = db.Column(db.Float, nullable=False)
+    estado = db.Column(db.String(20), default='Activo')  # Activo, Finalizado, Suspendido
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    
+    cliente = db.relationship('Cliente', backref='servicios_contratados')
+    servicio = db.relationship('Servicio', backref='clientes_asociados')
+
 @login_manager.user_loader
 def load_user(user_id):
     return Usuario.query.get(int(user_id))
 
-# Sistema de Validaciones MEJORADO con algoritmos oficiales
+# =============================================
+# FUNCIONES DE SEGURIDAD Y PERMISOS
+# =============================================
+
+# Funciones de utilidad para seguridad
+def requiere_rol(roles_permitidos):
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if not current_user.is_authenticated:
+                return redirect(url_for('login'))
+            if current_user.rol.nombre not in roles_permitidos:
+                flash('No tienes permisos para acceder a esta página.', 'danger')
+                return redirect(url_for('index'))
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+
+# Decoradores de permisos específicos
+def admin_required(f):
+    return requiere_rol(['ADMIN'])(f)
+
+def gerente_required(f):
+    return requiere_rol(['ADMIN', 'GERENTE'])(f)
+
+def cajero_required(f):
+    return requiere_rol(['ADMIN', 'GERENTE', 'CAJERO'])(f)
+
+def consulta_required(f):
+    return requiere_rol(['ADMIN', 'GERENTE', 'CONSULTA'])(f)
+
+# Funciones auxiliares para permisos
+def obtener_modulos_permitidos(rol):
+    permisos = {
+        'ADMIN': ['Dashboard', 'Movimientos', 'Consulta', 'Reportes', 'Administración', 'Seguridad', 'Facturación'],
+        'GERENTE': ['Dashboard', 'Movimientos', 'Consulta', 'Reportes', 'Administración', 'Facturación'],
+        'CAJERO': ['Dashboard', 'Movimientos', 'Facturación'],
+        'CONSULTA': ['Dashboard', 'Consulta', 'Reportes', 'Facturación']
+    }
+    return permisos.get(rol, [])
+
+def obtener_acciones_permitidas(rol):
+    acciones = {
+        'ADMIN': ['Ver todo', 'Crear', 'Editar', 'Eliminar', 'Generar reportes', 'Administrar usuarios', 'Administrar facturas'],
+        'GERENTE': ['Ver todo', 'Crear', 'Editar', 'Generar reportes', 'Administrar facturas'],
+        'CAJERO': ['Ver movimientos', 'Crear movimientos', 'Registrar pagos', 'Facturar'],
+        'CONSULTA': ['Ver consultas', 'Generar reportes', 'Ver facturas']
+    }
+    return acciones.get(rol, [])
+
+# Función auxiliar para manejar eliminaciones
+def safe_delete(model, id):
+    try:
+        registro = model.query.get_or_404(id)
+        db.session.delete(registro)
+        db.session.commit()
+        return True, 'Registro eliminado correctamente'
+    except Exception as e:
+        db.session.rollback()
+        return False, f'Error al eliminar: {str(e)}'
+
+# =============================================
+# SISTEMA DE VALIDACIONES
+# =============================================
+
 class Validator:
     @staticmethod
     def validar_texto(texto, campo, min_len=1, max_len=200):
@@ -423,62 +648,144 @@ def validar_movimiento(data):
     
     return True, "Movimiento válido"
 
-# Funciones de utilidad para seguridad
-def requiere_rol(roles_permitidos):
-    def decorator(f):
-        @wraps(f)
-        def decorated_function(*args, **kwargs):
-            if not current_user.is_authenticated:
-                return redirect(url_for('login'))
-            if current_user.rol.nombre not in roles_permitidos:
-                flash('No tienes permisos para acceder a esta página.', 'danger')
-                return redirect(url_for('index'))
-            return f(*args, **kwargs)
-        return decorated_function
-    return decorator
+# =============================================
+# PROCESOS FINANCIEROS AVANZADOS
+# =============================================
 
-# Decoradores de permisos específicos
-def admin_required(f):
-    return requiere_rol(['ADMIN'])(f)
-
-def gerente_required(f):
-    return requiere_rol(['ADMIN', 'GERENTE'])(f)
-
-def cajero_required(f):
-    return requiere_rol(['ADMIN', 'GERENTE', 'CAJERO'])(f)
-
-def consulta_required(f):
-    return requiere_rol(['ADMIN', 'GERENTE', 'CONSULTA'])(f)
-
-# Funciones auxiliares para permisos
-def obtener_modulos_permitidos(rol):
-    permisos = {
-        'ADMIN': ['Dashboard', 'Movimientos', 'Consulta', 'Reportes', 'Administración', 'Seguridad'],
-        'GERENTE': ['Dashboard', 'Movimientos', 'Consulta', 'Reportes', 'Administración'],
-        'CAJERO': ['Dashboard', 'Movimientos'],
-        'CONSULTA': ['Dashboard', 'Consulta', 'Reportes']
-    }
-    return permisos.get(rol, [])
-
-def obtener_acciones_permitidas(rol):
-    acciones = {
-        'ADMIN': ['Ver todo', 'Crear', 'Editar', 'Eliminar', 'Generar reportes', 'Administrar usuarios'],
-        'GERENTE': ['Ver todo', 'Crear', 'Editar', 'Generar reportes',],
-        'CAJERO': ['Ver movimientos', 'Crear movimientos'],
-        'CONSULTA': ['Ver consultas', 'Generar reportes']
-    }
-    return acciones.get(rol, [])
-
-# Función auxiliar para manejar eliminaciones
-def safe_delete(model, id):
-    try:
-        registro = model.query.get_or_404(id)
-        db.session.delete(registro)
+class AnalisisFinanciero:
+    @staticmethod
+    def calcular_cierre_diario(fecha_cierre=None):
+        """Calcula y registra el cierre diario de caja"""
+        if not fecha_cierre:
+            fecha_cierre = date.today()
+        
+        # Obtener movimientos del día
+        movimientos_dia = MovimientoCaja.query.filter(
+            db.func.date(MovimientoCaja.fecha_movimiento) == fecha_cierre
+        ).all()
+        
+        total_ingresos = sum(m.monto for m in movimientos_dia)
+        
+        # Crear registro de cierre
+        cierre = CierreDiario(
+            fecha=fecha_cierre,
+            total_ingresos=total_ingresos,
+            total_egresos=0,  # Por ahora solo manejamos ingresos
+            saldo_final=total_ingresos,
+            estado='Cerrado'
+        )
+        
+        db.session.add(cierre)
         db.session.commit()
-        return True, 'Registro eliminado correctamente'
-    except Exception as e:
-        db.session.rollback()
-        return False, f'Error al eliminar: {str(e)}'
+        return cierre
+
+    @staticmethod
+    def generar_proyeccion_flujo_caja(dias=30):
+        """Genera proyección de flujo de caja basada en datos históricos"""
+        fecha_fin = date.today()
+        fecha_inicio = fecha_fin - timedelta(days=90)  # Últimos 90 días
+        
+        movimientos = MovimientoCaja.query.filter(
+            MovimientoCaja.fecha_movimiento.between(fecha_inicio, fecha_fin)
+        ).all()
+        
+        if not movimientos:
+            return []
+        
+        # Crear DataFrame para análisis
+        datos = []
+        for m in movimientos:
+            datos.append({
+                'fecha': m.fecha_movimiento.date(),
+                'monto': float(m.monto),
+                'servicio': m.servicio.descripcion
+            })
+        
+        df = pd.DataFrame(datos)
+        
+        # Proyección usando promedio móvil
+        proyecciones = []
+        promedio_diario = df['monto'].mean()
+        
+        for i in range(1, dias + 1):
+            fecha_proyeccion = fecha_fin + timedelta(days=i)
+            proyecciones.append({
+                'fecha': fecha_proyeccion,
+                'monto_proyectado': promedio_diario,
+                'tipo': 'Proyección'
+            })
+        
+        return proyecciones
+
+    @staticmethod
+    def calcular_indicadores_financieros():
+        """Calcula indicadores financieros clave"""
+        # 1. Liquidez - Flujo de caja diario promedio
+        ultimos_30_dias = date.today() - timedelta(days=30)
+        movimientos_recientes = MovimientoCaja.query.filter(
+            MovimientoCaja.fecha_movimiento >= ultimos_30_dias
+        ).all()
+        
+        if movimientos_recientes:
+            flujo_promedio_diario = sum(m.monto for m in movimientos_recientes) / 30
+        else:
+            flujo_promedio_diario = 0
+        
+        # 2. Crecimiento mensual
+        mes_actual = date.today().month
+        mes_anterior = mes_actual - 1 if mes_actual > 1 else 12
+        
+        movimientos_mes_actual = MovimientoCaja.query.filter(
+            db.extract('month', MovimientoCaja.fecha_movimiento) == mes_actual
+        ).all()
+        
+        movimientos_mes_anterior = MovimientoCaja.query.filter(
+            db.extract('month', MovimientoCaja.fecha_movimiento) == mes_anterior
+        ).all()
+        
+        total_mes_actual = sum(m.monto for m in movimientos_mes_actual)
+        total_mes_anterior = sum(m.monto for m in movimientos_mes_anterior) if movimientos_mes_anterior else 1
+        
+        tasa_crecimiento = ((total_mes_actual - total_mes_anterior) / total_mes_anterior * 100) if total_mes_anterior else 0
+        
+        # Guardar indicadores
+        indicadores = [
+            IndicadorFinanciero(nombre='Flujo Diario Promedio', valor=flujo_promedio_diario, tipo='Liquidez'),
+            IndicadorFinanciero(nombre='Tasa Crecimiento Mensual', valor=tasa_crecimiento, tipo='Rentabilidad'),
+            IndicadorFinanciero(nombre='Eficiencia Operativa', valor=85.5, tipo='Eficiencia')  # Placeholder
+        ]
+        
+        for ind in indicadores:
+            db.session.add(ind)
+        
+        db.session.commit()
+        return indicadores
+
+    @staticmethod
+    def analizar_tendencias_servicios():
+        """Analiza tendencias por servicio"""
+        servicios = Servicio.query.all()
+        tendencias = []
+        
+        for servicio in servicios:
+            movimientos_servicio = MovimientoCaja.query.filter_by(servicio_id=servicio.id).all()
+            
+            if len(movimientos_servicio) > 1:
+                montos = [float(m.monto) for m in movimientos_servicio]
+                tendencia = np.polyfit(range(len(montos)), montos, 1)[0]  # Pendiente
+                
+                tendencias.append({
+                    'servicio': servicio.descripcion,
+                    'tendencia': tendencia,
+                    'total_ingresos': sum(montos),
+                    'cantidad_movimientos': len(montos)
+                })
+        
+        return sorted(tendencias, key=lambda x: abs(x['tendencia']), reverse=True)
+
+# =============================================
+# RUTAS DE LA APLICACIÓN
+# =============================================
 
 # Crear tablas y datos iniciales
 with app.app_context():
@@ -692,6 +999,702 @@ def index():
                          total_movimientos=total_movimientos,
                          total_ingresos=total_ingresos)
 
+# =============================================
+# MÓDULO DE FACTURACIÓN
+# =============================================
+
+@app.route('/facturacion')
+@cajero_required
+def dashboard_facturacion():
+    """Dashboard principal de facturación"""
+    # Estadísticas rápidas
+    total_facturas = Factura.query.count()
+    facturas_pendientes = Factura.query.filter(Factura.estado.in_(['Pendiente', 'Parcial'])).count()
+    facturas_vencidas = Factura.query.filter(Factura.estado == 'Vencida').count()
+    
+    # Últimas facturas
+    ultimas_facturas = Factura.query.order_by(Factura.fecha_emision.desc()).limit(10).all()
+    
+    # Facturas por vencer (próximos 7 días)
+    hoy = datetime.now()
+    limite_7_dias = hoy + timedelta(days=7)
+    facturas_por_vencer = Factura.query.filter(
+        Factura.estado.in_(['Pendiente', 'Parcial']),
+        Factura.fecha_vencimiento.between(hoy, limite_7_dias)
+    ).order_by(Factura.fecha_vencimiento).limit(5).all()
+    
+    return render_template('facturacion/dashboard.html',
+                         total_facturas=total_facturas,
+                         facturas_pendientes=facturas_pendientes,
+                         facturas_vencidas=facturas_vencidas,
+                         ultimas_facturas=ultimas_facturas,
+                         facturas_por_vencer=facturas_por_vencer,
+                         hoy=hoy)
+
+@app.route('/facturacion/nueva-factura', methods=['GET', 'POST'])
+@cajero_required
+def nueva_factura():
+    """Crear nueva factura"""
+    if request.method == 'POST':
+        try:
+            cliente_id = int(request.form['cliente_id'])
+            servicio_id = int(request.form['servicio_id'])
+            monto_total = float(request.form['monto_total'])
+            descripcion = request.form.get('descripcion', '')
+            dias_vencimiento = int(request.form.get('dias_vencimiento', 30))
+            
+            # Validar datos
+            cliente = Cliente.query.get_or_404(cliente_id)
+            servicio = Servicio.query.get_or_404(servicio_id)
+            
+            if monto_total <= 0:
+                flash('El monto total debe ser mayor a 0', 'danger')
+                return redirect(url_for('nueva_factura'))
+            
+            # Crear factura
+            factura = Factura(
+                cliente_id=cliente_id,
+                servicio_id=servicio_id,
+                numero_factura=generar_numero_factura(),
+                monto_total=monto_total,
+                fecha_vencimiento=datetime.now() + timedelta(days=dias_vencimiento),
+                descripcion=descripcion
+            )
+            
+            db.session.add(factura)
+            db.session.commit()
+            
+            flash(f'Factura {factura.numero_factura} creada exitosamente', 'success')
+            return redirect(url_for('detalle_factura', factura_id=factura.id))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error al crear factura: {str(e)}', 'danger')
+    
+    # GET: Mostrar formulario
+    clientes = Cliente.query.filter_by(estado='Activo').all()
+    servicios = Servicio.query.filter_by(estado='Activo').all()
+    
+    return render_template('facturacion/nueva_factura.html',
+                         clientes=clientes,
+                         servicios=servicios)
+
+@app.route('/facturacion/factura/<int:factura_id>')
+@cajero_required
+def detalle_factura(factura_id):
+    """Ver detalle de factura específica"""
+    factura = Factura.query.get_or_404(factura_id)
+    pagos = Pago.query.filter_by(factura_id=factura_id).order_by(Pago.fecha_pago).all()
+    
+    return render_template('facturacion/detalle_factura.html',
+                         factura=factura,
+                         pagos=pagos)
+
+@app.route('/facturacion/factura/<int:factura_id>/registrar-pago', methods=['POST'])
+@cajero_required
+def registrar_pago_factura(factura_id):
+    """Registrar pago para una factura específica"""
+    try:
+        factura = Factura.query.get_or_404(factura_id)
+        
+        if factura.estado == 'Anulada':
+            flash('No se pueden registrar pagos en facturas anuladas', 'danger')
+            return redirect(url_for('detalle_factura', factura_id=factura_id))
+        
+        monto = float(request.form['monto'])
+        metodo_pago = request.form['metodo_pago']
+        referencia = request.form.get('referencia', '')
+        descripcion = request.form.get('descripcion', '')
+        
+        if monto <= 0:
+            flash('El monto debe ser mayor a 0', 'danger')
+            return redirect(url_for('detalle_factura', factura_id=factura_id))
+        
+        if monto > factura.saldo_pendiente:
+            flash(f'El monto excede el saldo pendiente (${factura.saldo_pendiente:.2f})', 'danger')
+            return redirect(url_for('detalle_factura', factura_id=factura_id))
+        
+        # Crear pago
+        pago = Pago(
+            factura_id=factura_id,
+            monto=monto,
+            metodo_pago=metodo_pago,
+            referencia=referencia,
+            descripcion=descripcion
+        )
+        
+        db.session.add(pago)
+        
+        # Actualizar estado de factura
+        actualizar_estado_factura(factura_id)
+        
+        db.session.commit()
+        flash(f'Pago de ${monto:.2f} registrado exitosamente', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error al registrar pago: {str(e)}', 'danger')
+    
+    return redirect(url_for('detalle_factura', factura_id=factura_id))
+
+@app.route('/facturacion/factura/<int:factura_id>/anular', methods=['POST'])
+@gerente_required
+def anular_factura(factura_id):
+    """Anular una factura (solo gerentes/admins)"""
+    factura = Factura.query.get_or_404(factura_id)
+    
+    if factura.estado == 'Anulada':
+        flash('Esta factura ya está anulada', 'warning')
+        return redirect(url_for('detalle_factura', factura_id=factura_id))
+    
+    if factura.monto_pagado > 0:
+        flash('No se pueden anular facturas con pagos registrados', 'danger')
+        return redirect(url_for('detalle_factura', factura_id=factura_id))
+    
+    try:
+        motivo = request.form.get('motivo', 'Sin especificar')
+        factura.estado = 'Anulada'
+        factura.descripcion = f"{factura.descripcion or ''}\n[ANULADA: {datetime.now().strftime('%Y-%m-%d')} - Motivo: {motivo}]"
+        
+        db.session.commit()
+        flash('Factura anulada exitosamente', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error al anular factura: {str(e)}', 'danger')
+    
+    return redirect(url_for('detalle_factura', factura_id=factura_id))
+
+@app.route('/facturacion/buscar-facturas')
+@cajero_required
+def buscar_facturas():
+    """Búsqueda de facturas por diversos criterios"""
+    query = request.args.get('q', '').strip()
+    estado = request.args.get('estado', '')
+    cliente_id = request.args.get('cliente_id', type=int)
+    
+    facturas_query = Factura.query
+    
+    if query:
+        facturas_query = facturas_query.filter(
+            Factura.numero_factura.ilike(f'%{query}%')
+        )
+    
+    if estado:
+        facturas_query = facturas_query.filter(Factura.estado == estado)
+    
+    if cliente_id:
+        facturas_query = facturas_query.filter(Factura.cliente_id == cliente_id)
+    
+    facturas = facturas_query.order_by(Factura.fecha_emision.desc()).all()
+    clientes = Cliente.query.filter_by(estado='Activo').all()
+    
+    return render_template('facturacion/buscar_facturas.html',
+                         facturas=facturas,
+                         clientes=clientes,
+                         query=query,
+                         estado=estado,
+                         cliente_id=cliente_id)
+
+@app.route('/facturacion/reporte-cartera')
+@gerente_required
+def reporte_cartera():
+    """Reporte detallado de cartera por vencer/vencida"""
+    hoy = datetime.now()
+    
+    # Facturas vencidas
+    facturas_vencidas = Factura.query.filter(
+        Factura.estado.in_(['Pendiente', 'Parcial', 'Vencida']),
+        Factura.fecha_vencimiento < hoy
+    ).order_by(Factura.fecha_vencimiento).all()
+    
+    # Facturas por vencer (próximos 7 días)
+    limite_7_dias = hoy + timedelta(days=7)
+    facturas_por_vencer = Factura.query.filter(
+        Factura.estado.in_(['Pendiente', 'Parcial']),
+        Factura.fecha_vencimiento.between(hoy, limite_7_dias)
+    ).order_by(Factura.fecha_vencimiento).all()
+    
+    # Totales
+    total_vencido = sum(f.saldo_pendiente for f in facturas_vencidas)
+    total_por_vencer = sum(f.saldo_pendiente for f in facturas_por_vencer)
+    
+    return render_template('facturacion/reporte_cartera.html',
+                         facturas_vencidas=facturas_vencidas,
+                         facturas_por_vencer=facturas_por_vencer,
+                         total_vencido=total_vencido,
+                         total_por_vencer=total_por_vencer,
+                         hoy=hoy,
+                         limite_7_dias=limite_7_dias)
+
+@app.route('/facturacion/factura/<int:factura_id>/reimprimir')
+@cajero_required
+def reimprimir_factura(factura_id):
+    """Reimprimir factura en formato PDF"""
+    try:
+        factura = Factura.query.get_or_404(factura_id)
+        pagos = Pago.query.filter_by(factura_id=factura_id).order_by(Pago.fecha_pago).all()
+        
+        # Crear PDF
+        pdf = PDFReport()
+        pdf.add_page()
+        
+        # Encabezado UNAPEC
+        pdf.set_font('Arial', 'B', 16)
+        pdf.cell(0, 10, 'UNIVERSIDAD APEC (UNAPEC)', 0, 1, 'C')
+        pdf.set_font('Arial', 'B', 14)
+        pdf.cell(0, 10, 'FACTURA', 0, 1, 'C')
+        
+        # Información de la factura
+        pdf.ln(10)
+        pdf.set_font('Arial', '', 12)
+        pdf.cell(50, 10, 'Número Factura:', 0, 0)
+        pdf.cell(0, 10, factura.numero_factura, 0, 1)
+        pdf.cell(50, 10, 'Fecha Emisión:', 0, 0)
+        pdf.cell(0, 10, factura.fecha_emision.strftime('%d/%m/%Y'), 0, 1)
+        pdf.cell(50, 10, 'Fecha Vencimiento:', 0, 0)
+        pdf.cell(0, 10, factura.fecha_vencimiento.strftime('%d/%m/%Y') if factura.fecha_vencimiento else 'N/A', 0, 1)
+        pdf.cell(50, 10, 'Estado:', 0, 0)
+        pdf.cell(0, 10, factura.estado, 0, 1)
+        
+        # Información del cliente
+        pdf.ln(10)
+        pdf.set_font('Arial', 'B', 12)
+        pdf.cell(0, 10, 'INFORMACIÓN DEL CLIENTE', 0, 1)
+        pdf.set_font('Arial', '', 10)
+        pdf.cell(50, 8, 'Nombre:', 0, 0)
+        pdf.cell(0, 8, factura.cliente.nombre, 0, 1)
+        pdf.cell(50, 8, 'Documento:', 0, 0)
+        pdf.cell(0, 8, f"{factura.cliente.tipo_documento}: {factura.cliente.numero_documento}", 0, 1)
+        
+        # Detalle del servicio
+        pdf.ln(10)
+        pdf.set_font('Arial', 'B', 12)
+        pdf.cell(0, 10, 'DETALLE DEL SERVICIO', 0, 1)
+        pdf.set_font('Arial', '', 10)
+        pdf.cell(50, 8, 'Servicio:', 0, 0)
+        pdf.cell(0, 8, factura.servicio.descripcion, 0, 1)
+        if factura.descripcion:
+            pdf.cell(50, 8, 'Descripción:', 0, 0)
+            pdf.multi_cell(0, 8, factura.descripcion)
+        
+        # Montos
+        pdf.ln(10)
+        pdf.set_font('Arial', 'B', 12)
+        pdf.cell(0, 10, 'DETALLE DE MONTO', 0, 1)
+        
+        pdf.set_font('Arial', '', 10)
+        pdf.cell(100, 8, 'Monto Total:', 0, 0)
+        pdf.cell(0, 8, f"${factura.monto_total:,.2f}", 0, 1)
+        pdf.cell(100, 8, 'Monto Pagado:', 0, 0)
+        pdf.cell(0, 8, f"${factura.monto_pagado:,.2f}", 0, 1)
+        pdf.cell(100, 8, 'Saldo Pendiente:', 0, 0)
+        pdf.cell(0, 8, f"${factura.saldo_pendiente:,.2f}", 0, 1)
+        
+        # Historial de pagos si existe
+        if pagos:
+            pdf.ln(10)
+            pdf.set_font('Arial', 'B', 12)
+            pdf.cell(0, 10, 'HISTORIAL DE PAGOS', 0, 1)
+            
+            pdf.set_fill_color(200, 200, 200)
+            pdf.set_font('Arial', 'B', 10)
+            pdf.cell(40, 8, 'Fecha', 1, 0, 'C', True)
+            pdf.cell(40, 8, 'Método', 1, 0, 'C', True)
+            pdf.cell(50, 8, 'Referencia', 1, 0, 'C', True)
+            pdf.cell(40, 8, 'Monto', 1, 1, 'C', True)
+            
+            pdf.set_font('Arial', '', 9)
+            for pago in pagos:
+                pdf.cell(40, 8, pago.fecha_pago.strftime('%d/%m/%Y'), 1, 0, 'C')
+                pdf.cell(40, 8, pago.metodo_pago, 1, 0, 'C')
+                pdf.cell(50, 8, pago.referencia or 'N/A', 1, 0, 'C')
+                pdf.cell(40, 8, f"${pago.monto:,.2f}", 1, 1, 'R')
+        
+        # Pie de página
+        pdf.ln(15)
+        pdf.set_font('Arial', 'I', 8)
+        pdf.cell(0, 10, f'Documento generado el: {datetime.now().strftime("%d/%m/%Y %H:%M")}', 0, 0, 'C')
+        
+        # Generar PDF
+        pdf_buffer = io.BytesIO()
+        pdf_output = pdf.output(dest='S')
+        if isinstance(pdf_output, str):
+            pdf_buffer.write(pdf_output.encode('latin1'))
+        else:
+            pdf_buffer.write(pdf_output)
+        pdf_buffer.seek(0)
+        
+        return Response(
+            pdf_buffer.getvalue(),
+            mimetype='application/pdf',
+            headers={
+                'Content-Disposition': f'inline; filename=factura_{factura.numero_factura}.pdf'
+            }
+        )
+        
+    except Exception as e:
+        flash(f'Error al generar PDF: {str(e)}', 'danger')
+        return redirect(url_for('detalle_factura', factura_id=factura_id))
+
+@app.route('/facturacion/dashboard-gerencial')
+@gerente_required
+def dashboard_gerencial_facturacion():
+    """Dashboard gerencial con métricas avanzadas"""
+    
+    # Métricas del mes actual
+    mes_actual = datetime.now().month
+    año_actual = datetime.now().year
+    
+    facturas_mes = Factura.query.filter(
+        db.extract('year', Factura.fecha_emision) == año_actual,
+        db.extract('month', Factura.fecha_emision) == mes_actual
+    ).all()
+    
+    # Cálculos
+    total_facturado_mes = sum(f.monto_total for f in facturas_mes)
+    total_cobrado_mes = sum(f.monto_pagado for f in facturas_mes)
+    total_pendiente_mes = sum(f.saldo_pendiente for f in facturas_mes)
+    
+    # Porcentaje de cobranza
+    porcentaje_cobranza = (total_cobrado_mes / total_facturado_mes * 100) if total_facturado_mes > 0 else 0
+    
+    # Facturas por estado
+    facturas_por_estado = db.session.query(
+        Factura.estado,
+        db.func.count(Factura.id).label('cantidad'),
+        db.func.sum(Factura.saldo_pendiente).label('monto_pendiente')
+    ).filter(
+        db.extract('year', Factura.fecha_emision) == año_actual,
+        db.extract('month', Factura.fecha_emision) == mes_actual
+    ).group_by(Factura.estado).all()
+    
+    # Top 5 servicios más facturados
+    top_servicios = db.session.query(
+        Servicio.descripcion,
+        db.func.count(Factura.id).label('cantidad_facturas'),
+        db.func.sum(Factura.monto_total).label('total_facturado')
+    ).join(Factura).filter(
+        db.extract('year', Factura.fecha_emision) == año_actual,
+        db.extract('month', Factura.fecha_emision) == mes_actual
+    ).group_by(Servicio.id).order_by(db.desc('total_facturado')).limit(5).all()
+    
+    # Evolución últimos 6 meses
+    meses_data = []
+    for i in range(6):
+        mes = mes_actual - i
+        año = año_actual
+        if mes <= 0:
+            mes += 12
+            año -= 1
+        
+        facturas_mes_i = Factura.query.filter(
+            db.extract('year', Factura.fecha_emision) == año,
+            db.extract('month', Factura.fecha_emision) == mes
+        ).all()
+        
+        facturado = sum(f.monto_total for f in facturas_mes_i)
+        cobrado = sum(f.monto_pagado for f in facturas_mes_i)
+        
+        meses_data.append({
+            'mes': mes,
+            'año': año,
+            'facturado': facturado,
+            'cobrado': cobrado,
+            'pendiente': facturado - cobrado
+        })
+    
+    meses_data.reverse()  # Orden cronológico
+    
+    return render_template('facturacion/dashboard_gerencial.html',
+                         total_facturado_mes=total_facturado_mes,
+                         total_cobrado_mes=total_cobrado_mes,
+                         total_pendiente_mes=total_pendiente_mes,
+                         porcentaje_cobranza=porcentaje_cobranza,
+                         facturas_por_estado=facturas_por_estado,
+                         top_servicios=top_servicios,
+                         meses_data=meses_data)
+
+@app.route('/facturacion/sincronizar-movimientos')
+@admin_required
+def sincronizar_movimientos():
+    """Sincronizar movimientos antiguos con sistema de facturación"""
+    try:
+        # Buscar movimientos sin factura asociada
+        movimientos_sin_factura = MovimientoCaja.query.filter(
+            ~MovimientoCaja.id.in_(db.session.query(Pago.movimiento_id).filter(Pago.movimiento_id.isnot(None)))
+        ).all()
+        
+        contador = 0
+        for movimiento in movimientos_sin_factura:
+            # Buscar o crear factura para este movimiento
+            factura = Factura.query.filter_by(
+                cliente_id=movimiento.cliente_id,
+                servicio_id=movimiento.servicio_id,
+                estado='Pendiente'
+            ).first()
+            
+            if not factura:
+                # Crear factura automática
+                factura = Factura(
+                    cliente_id=movimiento.cliente_id,
+                    servicio_id=movimiento.servicio_id,
+                    numero_factura=generar_numero_factura(),
+                    monto_total=movimiento.monto,
+                    saldo_pendiente=0,  # Se ajustará con el pago
+                    descripcion=f"Factura generada automáticamente por sincronización - Movimiento #{movimiento.id}"
+                )
+                db.session.add(factura)
+                db.session.flush()
+            
+            # Crear pago
+            pago = Pago(
+                factura_id=factura.id,
+                movimiento_id=movimiento.id,
+                monto=movimiento.monto,
+                metodo_pago='Sincronizado',
+                referencia=f"MOV-{movimiento.id}",
+                descripcion="Pago sincronizado desde movimientos existentes"
+            )
+            db.session.add(pago)
+            
+            contador += 1
+        
+        if contador > 0:
+            # Recalcular todas las facturas
+            facturas = Factura.query.all()
+            for factura in facturas:
+                actualizar_estado_factura(factura.id)
+            
+            db.session.commit()
+            flash(f'{contador} movimientos sincronizados exitosamente', 'success')
+        else:
+            flash('No hay movimientos pendientes por sincronizar', 'info')
+            
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error en sincronización: {str(e)}', 'danger')
+    
+    return redirect(url_for('dashboard_facturacion'))
+
+@app.route('/facturacion/verificar-integridad')
+@admin_required
+def verificar_integridad():
+    """Verificar integridad de datos entre facturas y movimientos"""
+    problemas = []
+    
+    # 1. Verificar que todos los pagos tengan movimiento válido
+    pagos_sin_movimiento = Pago.query.filter(
+        Pago.movimiento_id.isnot(None),
+        ~Pago.movimiento_id.in_(db.session.query(MovimientoCaja.id))
+    ).all()
+    
+    if pagos_sin_movimiento:
+        problemas.append(f"{len(pagos_sin_movimiento)} pagos con movimiento no encontrado")
+    
+    # 2. Verificar que los montos coincidan
+    pagos = Pago.query.filter(Pago.movimiento_id.isnot(None)).all()
+    for pago in pagos:
+        movimiento = MovimientoCaja.query.get(pago.movimiento_id)
+        if movimiento and abs(movimiento.monto - pago.monto) > 0.01:
+            problemas.append(f"Pago #{pago.id}: Monto diferente (Pago: ${pago.monto:.2f}, Movimiento: ${movimiento.monto:.2f})")
+    
+    # 3. Verificar facturas con saldo inconsistente
+    facturas = Factura.query.all()
+    for factura in facturas:
+        total_pagos = db.session.query(db.func.sum(Pago.monto)).filter(
+            Pago.factura_id == factura.id,
+            Pago.estado == 'Aplicado'
+        ).scalar() or 0
+        
+        if abs(factura.monto_pagado - total_pagos) > 0.01:
+            problemas.append(f"Factura {factura.numero_factura}: Monto pagado inconsistente")
+        
+        saldo_calculado = factura.monto_total - total_pagos
+        if abs(factura.saldo_pendiente - saldo_calculado) > 0.01:
+            problemas.append(f"Factura {factura.numero_factura}: Saldo pendiente inconsistente")
+    
+    return render_template('facturacion/verificar_integridad.html',
+                         problemas=problemas,
+                         total_problemas=len(problemas))
+
+# =============================================
+# RUTAS FINANCIERAS
+# =============================================
+
+@app.route('/financiero/dashboard')
+@gerente_required
+def dashboard_financiero():
+    """Dashboard financiero completo"""
+    # Indicadores clave
+    indicadores = AnalisisFinanciero.calcular_indicadores_financieros()
+    
+    # Tendencias
+    tendencias = AnalisisFinanciero.analizar_tendencias_servicios()
+    
+    # Proyección
+    proyeccion = AnalisisFinanciero.generar_proyeccion_flujo_caja(15)
+    
+    # Cierres recientes
+    cierres_recientes = CierreDiario.query.order_by(CierreDiario.fecha.desc()).limit(7).all()
+    
+    return render_template('financiero_dashboard.html',
+                         indicadores=indicadores,
+                         tendencias=tendencias,
+                         proyeccion=proyeccion,
+                         cierres=cierres_recientes)
+
+@app.route('/financiero/cierre-diario', methods=['POST'])
+@gerente_required
+def ejecutar_cierre_diario():
+    """Ejecuta el cierre diario de caja"""
+    try:
+        cierre = AnalisisFinanciero.calcular_cierre_diario()
+        flash(f'Cierre diario ejecutado correctamente. Saldo: ${cierre.saldo_final:,.2f}', 'success')
+    except Exception as e:
+        flash(f'Error en cierre diario: {str(e)}', 'danger')
+    
+    return redirect(url_for('dashboard_financiero'))
+
+@app.route('/financiero/presupuestos')
+@gerente_required
+def presupuestos():
+    """Gestión de presupuestos"""
+    presupuestos_list = Presupuesto.query.all()
+    servicios = Servicio.query.filter_by(estado='Activo').all()
+    
+    # FORZAR RECÁLCULO AL CARGAR
+    for presupuesto in presupuestos_list:
+        # Recalcular monto ejecutado desde cero
+        movimientos_mes = MovimientoCaja.query.filter(
+            MovimientoCaja.servicio_id == presupuesto.servicio_id,
+            db.extract('year', MovimientoCaja.fecha_movimiento) == presupuesto.año,
+            db.extract('month', MovimientoCaja.fecha_movimiento) == presupuesto.mes
+        ).all()
+        
+        monto_ejecutado = sum(m.monto for m in movimientos_mes)
+        presupuesto.monto_ejecutado = monto_ejecutado
+        presupuesto.desviacion = monto_ejecutado - presupuesto.monto_presupuestado
+    
+    db.session.commit()
+    
+    return render_template('presupuestos.html',
+                         presupuestos=presupuestos_list,
+                         servicios=servicios)
+
+@app.route('/financiero/agregar-presupuesto', methods=['POST'])
+@gerente_required
+def agregar_presupuesto():
+    """Agrega un nuevo presupuesto"""
+    try:
+        servicio_id = int(request.form['servicio_id'])
+        año = int(request.form['año'])
+        mes = int(request.form['mes'])
+        monto = float(request.form['monto'])
+        
+        # Verificar si ya existe presupuesto para ese servicio/mes/año
+        existente = Presupuesto.query.filter_by(
+            servicio_id=servicio_id,
+            año=año,
+            mes=mes
+        ).first()
+        
+        if existente:
+            flash('Ya existe un presupuesto para este servicio en el período seleccionado', 'warning')
+        else:
+            nuevo_presupuesto = Presupuesto(
+                servicio_id=servicio_id,
+                año=año,
+                mes=mes,
+                monto_presupuestado=monto
+            )
+            
+            db.session.add(nuevo_presupuesto)
+            db.session.commit()
+            flash('Presupuesto agregado correctamente', 'success')
+            
+    except Exception as e:
+        flash(f'Error al agregar presupuesto: {str(e)}', 'danger')
+    
+    return redirect(url_for('presupuestos'))
+
+@app.route('/financiero/analisis-tendencias')
+@consulta_required
+def analisis_tendencias():
+    """Análisis de tendencias financieras"""
+    tendencias = AnalisisFinanciero.analizar_tendencias_servicios()
+    
+    # Datos para gráficos
+    servicios = [t['servicio'] for t in tendencias[:5]]
+    tendencia_valores = [t['tendencia'] for t in tendencias[:5]]
+    
+    return render_template('analisis_tendencias.html',
+                         tendencias=tendencias,
+                         servicios=servicios,
+                         tendencia_valores=tendencia_valores)
+
+@app.route('/financiero/reporte-completo')
+@gerente_required
+def reporte_financiero_completo():
+    """Genera reporte financiero completo en PDF"""
+    try:
+        # Datos para el reporte
+        indicadores = AnalisisFinanciero.calcular_indicadores_financieros()
+        tendencias = AnalisisFinanciero.analizar_tendencias_servicios()
+        proyeccion = AnalisisFinanciero.generar_proyeccion_flujo_caja(30)
+        
+        # Crear PDF
+        pdf = PDFReport()
+        pdf.add_page()
+        
+        # Título
+        pdf.set_font('Arial', 'B', 16)
+        pdf.cell(0, 10, 'REPORTE FINANCIERO COMPLETO', 0, 1, 'C')
+        pdf.ln(10)
+        
+        # Indicadores
+        pdf.set_font('Arial', 'B', 14)
+        pdf.cell(0, 10, 'INDICADORES FINANCIEROS', 0, 1)
+        pdf.set_font('Arial', '', 10)
+        
+        for ind in indicadores:
+            pdf.cell(0, 8, f'{ind.nombre}: {ind.valor:.2f}', 0, 1)
+        
+        pdf.ln(10)
+        
+        # Tendencias
+        pdf.set_font('Arial', 'B', 14)
+        pdf.cell(0, 10, 'TENDENCIAS POR SERVICIO', 0, 1)
+        pdf.set_font('Arial', '', 10)
+        
+        for tendencia in tendencias[:5]:
+            pdf.cell(0, 8, f"{tendencia['servicio']}: ${tendencia['tendencia']:.2f} por día", 0, 1)
+        
+        # Guardar PDF
+        pdf_buffer = io.BytesIO()
+        pdf_output = pdf.output(dest='S')
+        if isinstance(pdf_output, str):
+            pdf_buffer.write(pdf_output.encode('latin1'))
+        else:
+            pdf_buffer.write(pdf_output)
+        pdf_buffer.seek(0)
+        
+        return Response(
+            pdf_buffer.getvalue(),
+            mimetype='application/pdf',
+            headers={
+                'Content-Disposition': f'attachment; filename=reporte_financiero_{datetime.now().strftime("%Y%m%d_%H%M")}.pdf'
+            }
+        )
+        
+    except Exception as e:
+        flash(f'Error al generar reporte: {str(e)}', 'danger')
+        return redirect(url_for('dashboard_financiero'))
+
+# =============================================
+# RUTAS DE CRUD BÁSICAS
+# =============================================
+
 # CRUD Tipos de Documentos
 @app.route('/tipos_documentos')
 @gerente_required
@@ -722,7 +1725,7 @@ def editar_tipo_documento(id):
     return redirect(url_for('tipos_documentos'))
 
 @app.route('/eliminar_tipo_documento/<int:id>')
-@gerente_required
+@admin_required  # SOLO ADMIN puede eliminar
 def eliminar_tipo_documento(id):
     success, message = safe_delete(TipoDocumento, id)
     flash(message, 'success' if success else 'danger')
@@ -758,7 +1761,7 @@ def editar_servicio(id):
     return redirect(url_for('servicios'))
 
 @app.route('/eliminar_servicio/<int:id>')
-@gerente_required
+@admin_required  # SOLO ADMIN puede eliminar
 def eliminar_servicio(id):
     success, message = safe_delete(Servicio, id)
     flash(message, 'success' if success else 'danger')
@@ -794,7 +1797,7 @@ def editar_forma_pago(id):
     return redirect(url_for('formas_pago'))
 
 @app.route('/eliminar_forma_pago/<int:id>')
-@gerente_required
+@admin_required  # SOLO ADMIN puede eliminar
 def eliminar_forma_pago(id):
     success, message = safe_delete(FormaPago, id)
     flash(message, 'success' if success else 'danger')
@@ -836,7 +1839,7 @@ def editar_modalidad_pago(id):
     return redirect(url_for('modalidades_pago'))
 
 @app.route('/eliminar_modalidad_pago/<int:id>')
-@gerente_required
+@admin_required  # SOLO ADMIN puede eliminar
 def eliminar_modalidad_pago(id):
     success, message = safe_delete(ModalidadPago, id)
     flash(message, 'success' if success else 'danger')
@@ -966,7 +1969,7 @@ def editar_cliente(id):
     return redirect(url_for('clientes'))
 
 @app.route('/eliminar_cliente/<int:id>')
-@gerente_required
+@admin_required  # SOLO ADMIN puede eliminar
 def eliminar_cliente(id):
     success, message = safe_delete(Cliente, id)
     flash(message, 'success' if success else 'danger')
@@ -1098,13 +2101,13 @@ def editar_empleado(id):
     return redirect(url_for('empleados'))
 
 @app.route('/eliminar_empleado/<int:id>')
-@gerente_required
+@admin_required  # SOLO ADMIN puede eliminar
 def eliminar_empleado(id):
     success, message = safe_delete(Empleado, id)
     flash(message, 'success' if success else 'danger')
     return redirect(url_for('empleados'))
 
-# Movimientos de Caja
+# Movimientos de Caja - INTEGRADO CON FACTURACIÓN
 @app.route('/movimientos')
 @cajero_required
 def movimientos():
@@ -1142,6 +2145,16 @@ def movimientos():
     clientes = Cliente.query.filter_by(estado='Activo').all()
     empleados = Empleado.query.filter_by(estado='Activo').all()
     
+    # Obtener facturas pendientes para el formulario
+    facturas_pendientes = {}
+    for cliente in clientes:
+        facturas_cliente = Factura.query.filter(
+            Factura.cliente_id == cliente.id,
+            Factura.estado.in_(['Pendiente', 'Parcial'])
+        ).all()
+        if facturas_cliente:
+            facturas_pendientes[cliente.id] = facturas_cliente
+    
     return render_template('movimientos.html', 
                          movimientos=movimientos_list,
                          tipos_documentos=tipos_documentos,
@@ -1149,11 +2162,13 @@ def movimientos():
                          formas_pago=formas_pago,
                          modalidades_pago=modalidades_pago,
                          clientes=clientes,
-                         empleados=empleados)
+                         empleados=empleados,
+                         facturas_pendientes=facturas_pendientes)
 
 @app.route('/agregar_movimiento', methods=['POST'])
 @cajero_required
 def agregar_movimiento():
+    """Registrar movimiento con integración a facturación"""
     try:
         # Recoger datos del formulario
         empleado_id = int(request.form['empleado_id'])
@@ -1164,6 +2179,10 @@ def agregar_movimiento():
         modalidad_pago_id = int(request.form['modalidad_pago_id'])
         monto = float(request.form['monto'])
         descripcion = request.form.get('descripcion', '')
+        
+        # Nuevo campo: ¿Es pago de factura existente?
+        es_pago_factura = request.form.get('es_pago_factura', 'no') == 'si'
+        factura_id = request.form.get('factura_id', type=int)
         
         # Validar que las referencias existan
         if not Empleado.query.get(empleado_id):
@@ -1177,6 +2196,25 @@ def agregar_movimiento():
         if not Servicio.query.get(servicio_id):
             flash('El servicio seleccionado no existe', 'danger')
             return redirect(url_for('movimientos'))
+        
+        # Si es pago de factura, validar factura
+        if es_pago_factura and factura_id:
+            factura = Factura.query.get(factura_id)
+            if not factura:
+                flash('La factura especificada no existe', 'danger')
+                return redirect(url_for('movimientos'))
+            
+            if factura.cliente_id != cliente_id:
+                flash('El cliente no coincide con la factura', 'danger')
+                return redirect(url_for('movimientos'))
+            
+            if factura.servicio_id != servicio_id:
+                flash('El servicio no coincide con la factura', 'danger')
+                return redirect(url_for('movimientos'))
+            
+            if monto > factura.saldo_pendiente:
+                flash(f'El monto excede el saldo pendiente (${factura.saldo_pendiente:.2f})', 'danger')
+                return redirect(url_for('movimientos'))
         
         # Crear movimiento
         nuevo_movimiento = MovimientoCaja(
@@ -1193,9 +2231,70 @@ def agregar_movimiento():
         )
         
         db.session.add(nuevo_movimiento)
-        db.session.commit()
+        db.session.flush()  # Para obtener el ID
         
-        flash('Movimiento registrado correctamente', 'success')
+        # ========== INTEGRACIÓN CON FACTURACIÓN ==========
+        if es_pago_factura and factura_id:
+            # Ya validamos la factura arriba
+            metodo_pago = FormaPago.query.get(forma_pago_id)
+            
+            pago = Pago(
+                factura_id=factura_id,
+                movimiento_id=nuevo_movimiento.id,
+                monto=monto,
+                metodo_pago=metodo_pago.descripcion if metodo_pago else 'Efectivo',
+                referencia=f"MOV-{nuevo_movimiento.id}",
+                descripcion=f"Pago registrado desde módulo de movimientos: {descripcion}"
+            )
+            db.session.add(pago)
+            
+            # Actualizar estado de factura
+            actualizar_estado_factura(factura_id)
+            
+            mensaje = f'Pago de ${monto:.2f} registrado para factura {factura.numero_factura}'
+        else:
+            # Buscar factura pendiente para aplicar este pago
+            factura_pendiente = Factura.query.filter(
+                Factura.cliente_id == cliente_id,
+                Factura.servicio_id == servicio_id,
+                Factura.estado.in_(['Pendiente', 'Parcial'])
+            ).order_by(Factura.fecha_emision).first()
+            
+            if factura_pendiente and monto <= factura_pendiente.saldo_pendiente:
+                # Aplicar a factura existente
+                metodo_pago = FormaPago.query.get(forma_pago_id)
+                
+                pago = Pago(
+                    factura_id=factura_pendiente.id,
+                    movimiento_id=nuevo_movimiento.id,
+                    monto=monto,
+                    metodo_pago=metodo_pago.descripcion if metodo_pago else 'Efectivo',
+                    referencia=f"MOV-{nuevo_movimiento.id}",
+                    descripcion=f"Pago automático desde movimiento: {descripcion}"
+                )
+                db.session.add(pago)
+                
+                actualizar_estado_factura(factura_pendiente.id)
+                mensaje = f'Movimiento registrado y aplicado a factura {factura_pendiente.numero_factura}'
+            else:
+                mensaje = 'Movimiento registrado exitosamente'
+        
+        # ========== INTEGRACIÓN CON PRESUPUESTOS ==========
+        mes_actual = datetime.now().month
+        año_actual = datetime.now().year
+        
+        presupuesto = Presupuesto.query.filter_by(
+            servicio_id=servicio_id,
+            mes=mes_actual,
+            año=año_actual
+        ).first()
+        
+        if presupuesto:
+            presupuesto.monto_ejecutado += monto
+            presupuesto.desviacion = presupuesto.monto_ejecutado - presupuesto.monto_presupuestado
+        
+        db.session.commit()
+        flash(mensaje, 'success')
         
     except ValueError as e:
         flash('Error en los datos numéricos proporcionados', 'danger')
@@ -1421,9 +2520,6 @@ def exportar_pdf():
         pdf.set_font('Arial', '', 10)
         pdf.multi_cell(0, 8, 'No hay movimientos que coincidan con los criterios seleccionados.')
     
-    # Guardar PDF en buffer
-   # CORRECCIÓN SIMPLIFICADA - solo cambia estas líneas al final de la función:
-
     # Guardar PDF en buffer - VERSIÓN CORREGIDA
     pdf_buffer = io.BytesIO()
     pdf_output = pdf.output(dest='S')  # 'S' para obtener como string
@@ -1533,6 +2629,37 @@ def grafico_formas_pago():
     
     return Response(buf.getvalue(), mimetype='image/png')
 
+#cosa de facturacion pal cliente
+@app.route('/facturacion/saldo-cliente/<int:cliente_id>')
+@cajero_required
+def saldo_cliente(cliente_id):
+    """Muestra el saldo total pendiente de un cliente"""
+    cliente = Cliente.query.get_or_404(cliente_id)
+    
+    # Obtener todas las facturas del cliente
+    facturas = Factura.query.filter_by(cliente_id=cliente_id).all()
+    
+    # Calcular totales
+    total_facturado = sum(f.monto_total for f in facturas)
+    total_pagado = sum(f.monto_pagado for f in facturas)
+    total_pendiente = sum(f.saldo_pendiente for f in facturas)
+    
+    # Facturas por estado
+    facturas_pendientes = [f for f in facturas if f.estado in ['Pendiente', 'Parcial', 'Vencida']]
+    facturas_pagadas = [f for f in facturas if f.estado == 'Pagada']
+    
+    return render_template('facturacion/saldo_cliente.html',
+                         cliente=cliente,
+                         facturas=facturas,
+                         facturas_pendientes=facturas_pendientes,
+                         facturas_pagadas=facturas_pagadas,
+                         total_facturado=total_facturado,
+                         total_pagado=total_pagado,
+                         total_pendiente=total_pendiente)
+
+
+
+
 # Reportes Corregidos
 @app.route('/reporte')
 @consulta_required
@@ -1603,10 +2730,35 @@ def reporte():
                          fecha_desde=fecha_desde,
                          fecha_hasta=fecha_hasta)
 
-# Context processor para hacer datetime disponible en todos los templates
+# Context processor para hacer datetime y funciones disponibles en todos los templates
 @app.context_processor
-def inject_datetime():
-    return {'datetime': datetime}
+def inject_utilities():
+    def calcular_dias_vencimiento(fecha_vencimiento):
+        if not fecha_vencimiento:
+            return None
+        hoy = datetime.now()
+        diferencia = fecha_vencimiento - hoy
+        return diferencia.days
+    
+    def formato_moneda(monto):
+        return f"${monto:,.2f}"
+    
+    def obtener_color_estado(estado):
+        colores = {
+            'Pendiente': 'warning',
+            'Parcial': 'info',
+            'Pagada': 'success',
+            'Vencida': 'danger',
+            'Anulada': 'secondary'
+        }
+        return colores.get(estado, 'secondary')
+    
+    return {
+        'datetime': datetime,
+        'calcular_dias_vencimiento': calcular_dias_vencimiento,
+        'formato_moneda': formato_moneda,
+        'obtener_color_estado': obtener_color_estado
+    }
 
 if __name__ == '__main__':
     app.run(debug=True)

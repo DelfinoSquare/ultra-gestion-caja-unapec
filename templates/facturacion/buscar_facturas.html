@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Buscar Facturas - Sistema UNAPEC</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .search-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+            border-radius: 0 0 20px 20px;
+        }
+        
+        .search-card {
+            border-radius: 15px;
+            border: none;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+        }
+        
+        .filter-box {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 1.5rem;
+        }
+        
+        .badge-estado {
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-weight: 500;
+        }
+        
+        .result-count {
+            font-size: 0.9rem;
+            color: #6c757d;
+        }
+        
+        .table-facturas th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+        }
+        
+        .table-facturas tbody tr {
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .table-facturas tbody tr:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .btn-action {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.875rem;
+            min-width: 40px;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1rem;
+        }
+        
+        .empty-state i {
+            font-size: 4rem;
+            color: #dee2e6;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="search-header">
+            <div class="container">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h1 class="h3 mb-2"><i class="fas fa-search me-2"></i>Buscar Facturas</h1>
+                        <p class="mb-0">Encuentre facturas por diversos criterios</p>
+                    </div>
+                    <div>
+                        <a href="{{ url_for('dashboard_facturacion') }}" class="btn btn-light">
+                            <i class="fas fa-arrow-left me-2"></i>Volver
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filtros de Búsqueda -->
+        <div class="card search-card mb-4">
+            <div class="card-body">
+                <form method="GET" action="{{ url_for('buscar_facturas') }}">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Búsqueda General</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-search"></i></span>
+                                <input type="text" class="form-control" name="q" value="{{ query }}"
+                                       placeholder="Número de factura, cliente...">
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Estado</label>
+                            <select class="form-select" name="estado">
+                                <option value="">Todos los estados</option>
+                                <option value="Pendiente" {% if estado == 'Pendiente' %}selected{% endif %}>Pendiente</option>
+                                <option value="Parcial" {% if estado == 'Parcial' %}selected{% endif %}>Parcial</option>
+                                <option value="Pagada" {% if estado == 'Pagada' %}selected{% endif %}>Pagada</option>
+                                <option value="Vencida" {% if estado == 'Vencida' %}selected{% endif %}>Vencida</option>
+                                <option value="Anulada" {% if estado == 'Anulada' %}selected{% endif %}>Anulada</option>
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Cliente</label>
+                            <select class="form-select" name="cliente_id">
+                                <option value="">Todos los clientes</option>
+                                {% for cliente in clientes %}
+                                <option value="{{ cliente.id }}" {% if cliente_id == cliente.id %}selected{% endif %}>
+                                    {{ cliente.nombre }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-2 mb-3 d-flex align-items-end">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="fas fa-filter me-2"></i>Filtrar
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div class="result-count">
+                                    {% if query or estado or cliente_id %}
+                                        Búsqueda activa - 
+                                    {% endif %}
+                                    {{ facturas|length }} resultado(s) encontrado(s)
+                                </div>
+                                <div>
+                                    <a href="{{ url_for('buscar_facturas') }}" class="btn btn-outline-secondary btn-sm">
+                                        <i class="fas fa-redo me-1"></i>Limpiar
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Resultados -->
+        {% if facturas %}
+        <div class="card search-card">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover table-facturas">
+                        <thead>
+                            <tr>
+                                <th>N° Factura</th>
+                                <th>Cliente</th>
+                                <th>Servicio</th>
+                                <th>Fecha Emisión</th>
+                                <th>Fecha Vencimiento</th>
+                                <th>Monto Total</th>
+                                <th>Pagado</th>
+                                <th>Saldo</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for factura in facturas %}
+                            <tr onclick="window.location='{{ url_for('detalle_factura', factura_id=factura.id) }}'"
+                                style="cursor: pointer;">
+                                <td>
+                                    <strong>{{ factura.numero_factura }}</strong>
+                                </td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <div>
+                                            <strong>{{ factura.cliente.nombre[:20] }}{% if factura.cliente.nombre|length > 20 %}...{% endif %}</strong>
+                                            <small class="d-block text-muted">
+                                                {{ factura.cliente.tipo_documento }}: {{ factura.cliente.numero_documento }}
+                                            </small>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    {{ factura.servicio.descripcion[:30] }}{% if factura.servicio.descripcion|length > 30 %}...{% endif %}
+                                </td>
+                                <td>{{ factura.fecha_emision.strftime('%d/%m/%Y') }}</td>
+                                <td>
+                                    {% if factura.fecha_vencimiento %}
+                                        {{ factura.fecha_vencimiento.strftime('%d/%m/%Y') }}
+                                        {% if factura.estado in ['Pendiente', 'Parcial'] %}
+                                            <br>
+                                            <small class="{% if calcular_dias_vencimiento(factura.fecha_vencimiento) <= 0 %}text-danger{% elif calcular_dias_vencimiento(factura.fecha_vencimiento) <= 7 %}text-warning{% else %}text-success{% endif %}">
+                                                {% set dias = calcular_dias_vencimiento(factura.fecha_vencimiento) %}
+                                                {% if dias > 0 %}
+                                                    Vence en {{ dias }} días
+                                                {% elif dias == 0 %}
+                                                    Vence hoy
+                                                {% else %}
+                                                    Vencida hace {{ -dias }} días
+                                                {% endif %}
+                                            </small>
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="text-muted">N/A</span>
+                                    {% endif %}
+                                </td>
+                                <td><strong>{{ formato_moneda(factura.monto_total) }}</strong></td>
+                                <td class="text-success">{{ formato_moneda(factura.monto_pagado) }}</td>
+                                <td class="{% if factura.saldo_pendiente > 0 %}text-danger{% else %}text-success{% endif %}">
+                                    <strong>{{ formato_moneda(factura.saldo_pendiente) }}</strong>
+                                </td>
+                                <td>
+                                    {% set color = obtener_color_estado(factura.estado) %}
+                                    <span class="badge bg-{{ color }} badge-estado">
+                                        {{ factura.estado }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="btn-group" role="group">
+                                        <a href="{{ url_for('detalle_factura', factura_id=factura.id) }}" 
+                                           class="btn btn-outline-primary btn-action"
+                                           title="Ver detalle">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <a href="{{ url_for('reimprimir_factura', factura_id=factura.id) }}" 
+                                           class="btn btn-outline-secondary btn-action"
+                                           title="Imprimir" target="_blank">
+                                            <i class="fas fa-print"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Resumen -->
+                <div class="row mt-4">
+                    <div class="col-md-3 col-6">
+                        <div class="text-center p-3 bg-primary bg-opacity-10 rounded">
+                            <h6 class="text-muted">Total Facturas</h6>
+                            <h4 class="text-primary">{{ facturas|length }}</h4>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <div class="text-center p-3 bg-success bg-opacity-10 rounded">
+                            <h6 class="text-muted">Total Monto</h6>
+                            <h4 class="text-success">{{ formato_moneda(facturas|sum(attribute='monto_total')) }}</h4>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <div class="text-center p-3 bg-warning bg-opacity-10 rounded">
+                            <h6 class="text-muted">Total Pendiente</h6>
+                            <h4 class="text-warning">{{ formato_moneda(facturas|sum(attribute='saldo_pendiente')) }}</h4>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <div class="text-center p-3 bg-danger bg-opacity-10 rounded">
+                            <h6 class="text-muted">Vencidas</h6>
+                            <h4 class="text-danger">{{ facturas|selectattr('estado', 'equalto', 'Vencida')|list|length }}</h4>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <!-- Estado vacío -->
+        <div class="card search-card">
+            <div class="card-body">
+                <div class="empty-state">
+                    <i class="fas fa-file-invoice"></i>
+                    <h4 class="text-muted mb-3">No se encontraron facturas</h4>
+                    <p class="text-muted mb-4">
+                        {% if query or estado or cliente_id %}
+                        No hay facturas que coincidan con los criterios de búsqueda.
+                        {% else %}
+                        No hay facturas registradas en el sistema.
+                        {% endif %}
+                    </p>
+                    <div class="d-flex justify-content-center gap-2">
+                        <a href="{{ url_for('dashboard_facturacion') }}" class="btn btn-outline-primary">
+                            <i class="fas fa-arrow-left me-2"></i>Volver al Dashboard
+                        </a>
+                        <a href="{{ url_for('nueva_factura') }}" class="btn btn-primary">
+                            <i class="fas fa-plus-circle me-2"></i>Crear Primera Factura
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Auto-seleccionar en búsqueda rápida
+        const searchInput = document.querySelector('input[name="q"]');
+        searchInput.focus();
+        searchInput.select();
+        
+        // Exportar a Excel
+        function exportToExcel() {
+            alert('Función de exportación a Excel en desarrollo');
+        }
+        
+        // Exportar a PDF
+        function exportToPDF() {
+            alert('Función de exportación a PDF en desarrollo');
+        }
+    </script>
+</body>
+</html>
